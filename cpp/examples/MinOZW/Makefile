@@ -19,7 +19,9 @@ top_srcdir := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../../)
 
 
 INCLUDES	:= -I $(top_srcdir)/cpp/src -I $(top_srcdir)/cpp/src/command_classes/ -I $(top_srcdir)/cpp/src/value_classes/ \
-	-I $(top_srcdir)/cpp/src/platform/ -I $(top_srcdir)/cpp/src/platform/unix -I $(top_srcdir)/cpp/tinyxml/ -I $(top_srcdir)/cpp/hidapi/hidapi/
+	-I $(top_srcdir)/cpp/src/platform/ -I $(top_srcdir)/cpp/src/platform/unix -I $(top_srcdir)/cpp/tinyxml/ -I $(top_srcdir)/cpp/hidapi/hidapi/ \
+	-I /usr/include/mysql -I /usr/local/include -I /usr/include/gammu
+
 LIBS =  $(wildcard $(LIBDIR)/*.so $(top_builddir)/*.so $(top_builddir)/cpp/build/*.so )
 LIBSDIR = $(abspath $(dir $(firstword $(LIBS))))
 minozwsrc := $(notdir $(wildcard $(top_srcdir)/cpp/examples/MinOZW/*.cpp))
@@ -40,7 +42,7 @@ endif
 
 $(OBJDIR)/MinOZW:	$(patsubst %.cpp,$(OBJDIR)/%.o,$(minozwsrc))
 	@echo "Linking $(OBJDIR)/MinOZW"
-	$(LD) $(LDFLAGS) -o $@ $< $(LIBS) -pthread
+	$(LD) $(LDFLAGS) -o $@ $< $(LIBS) -pthread -ludev -L/usr/lib/mysql -lmysqlclient -L/usr/local/lib -lgadu -lGammu -lstdc++ -lssh
 
 $(top_builddir)/MinOZW: $(top_srcdir)/cpp/examples/MinOZW/MinOZW.in $(OBJDIR)/MinOZW
 	@echo "Creating Temporary Shell Launch Script"
