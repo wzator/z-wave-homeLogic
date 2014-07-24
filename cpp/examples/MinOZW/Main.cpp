@@ -66,6 +66,9 @@
 #include <sys/socket.h>
 #include <resolv.h>
 #include <libssh/libssh.h>
+#include "base64.h"
+#include <ifaddrs.h>
+
 
 #define PACKETSIZE  64
 
@@ -113,6 +116,11 @@ struct config_type
 	int    valve_node;
 	int    door_node;
 	char   tv_ip[64];
+	char   tv_smart[64];
+	char   tv_login[50];
+	char   tv_pass[50];
+	char   tv_start[256];
+	char   tv_off[256];
 	int    tv_port;
 	int    dynamic[256];
 	int    washer_node;
@@ -456,6 +464,151 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 	return return_value;
 }
 
+/* TV SAMSUNG Remote Controll ********************************************************/
+
+char *tozero(char *string)
+{
+    char mem[1024];
+    sprintf(mem,"%s",string);
+    int counter = 0;
+    for (int a=0; a<strlen(mem); a++)
+    {
+	if ((unsigned char)mem[a] == 0xff)
+	{
+	    string[counter] = 0;
+	}
+	else
+	{
+	    string[counter] = mem[a];
+	}
+
+	counter++;
+    }
+    string[counter+1]=0;
+    
+    return string;
+}
+
+int tvRemote(std::string skey, std::string myip, std::string remoteip)
+{
+    int 	sockfd, portno, n;
+    struct	sockaddr_in serv_addr;
+    struct	ifaddrs *ifaddr, *ifa;
+    struct	hostent *server;
+    char	buffer[1024];
+    char	host[NI_MAXHOST];
+    char	message[1024];
+    char	part[2048];
+    int		family;
+
+    portno = 55000;
+    server = gethostbyname(remoteip.c_str());
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0)
+    {
+        perror("ERROR opening socket");
+        return -1;
+    }
+
+    if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host\n");
+        return -1;
+    }
+
+    if (getifaddrs(&ifaddr) == -1) {
+	perror("getifaddrs");
+	return -1;
+    }
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+       if (ifa->ifa_addr == NULL)
+          continue;
+
+	family = ifa->ifa_addr->sa_family;
+	if (family == AF_INET || family == AF_INET6)
+	{
+	    int s = getnameinfo(ifa->ifa_addr,
+		(family == AF_INET) ? sizeof(struct sockaddr_in) :
+		sizeof(struct sockaddr_in6),
+	        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+	    if (s == 0 && strcmp(ifa->ifa_name,"eth0")==0) {
+		    printf("add: %s = %s\n",host,ifa->ifa_name);
+		    break;
+	    }
+	}
+
+    }
+
+    freeifaddrs(ifaddr);
+
+    const std::string mymac		= "01-23-45-67-89-ab";
+    const char *appstring		= "iphone..iapp.samsung\0"; 
+    const char *tvappstring		= "iphone.LE37C650.iapp.samsung\0"; 
+    const std::string remotename	= "Perl Samsung Remote";
+
+    char messagepart1[1024];
+    char messagepart2[1024];
+    char messagepart3[1024];
+    char part1[1024];
+    char part2[1024];
+    char part3[1024];
+
+    std::string base64mymac		= base64_encode(reinterpret_cast<const unsigned char*>(mymac.c_str()),mymac.length());
+    std::string base64remotename	= base64_encode(reinterpret_cast<const unsigned char*>(remotename.c_str()),remotename.length());
+    std::string base64skey		= base64_encode(reinterpret_cast<const unsigned char*>(skey.c_str()),skey.length());
+    std::string base64myip		= base64_encode(reinterpret_cast<const unsigned char*>(myip.c_str()),myip.length());
+
+
+    sprintf(messagepart1,"\x64\xFF%c\xFF%s%c\xFF%s%c\xFF%s",strlen(base64myip.c_str()),base64myip.c_str(),strlen(base64mymac.c_str()),base64mymac.c_str(), strlen(base64remotename.c_str()),base64remotename.c_str() );
+    sprintf(part1,"\xFF%c\xFF%s%c\xFF%s\0\0",strlen(appstring),appstring,strlen(messagepart1),messagepart1);
+
+    sprintf(messagepart2, "\xc8\xFF");
+    sprintf(part2,"\xFF%c\xFF%s%c\xFF%s\0\0",strlen(appstring),appstring,strlen(messagepart2),messagepart2);
+
+    sprintf(messagepart3, "\xFF\xFF\xFF%c\xFF%s",base64skey.length(),base64skey.c_str());
+    sprintf(part3,"\xFF%c\xFF%s%c\xFF%s\0\0", strlen(tvappstring), tvappstring, strlen(messagepart3), messagepart3 );
+
+
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+         (char *)&serv_addr.sin_addr.s_addr,
+         server->h_length);
+    serv_addr.sin_port = htons(portno);
+
+    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0)
+    {
+        perror("ERROR connecting");
+        return -1;
+    }
+
+
+    int part1l = strlen(part1);
+    memcpy(tozero(part1),part1,1000);
+    n = write(sockfd,part1,part1l);
+
+    int part2l = strlen(part2);
+    memcpy(tozero(part2),part2,1000);
+    n = write(sockfd, part2,part2l);
+
+    int part3l = strlen(part3);
+    memcpy(tozero(part3),part3,1000);
+    n = write(sockfd,part3,part3l);
+
+    if (n < 0) 
+    {
+         perror("ERROR writing to socket");
+    }
+
+    bzero(buffer,256);
+    n = read(sockfd,buffer,255);
+    if (n < 0) 
+         perror("ERROR reading from socket");
+
+    close(sockfd);
+    return 0;
+}
 
 /* SSH ******************************************************************************/
 
@@ -1676,6 +1829,36 @@ int get_configuration(struct config_type *config, char *path)
 			continue;
 		}
 
+		if ( (strcmp(token,"TV_SMART") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->tv_smart, val);
+			continue;
+		}
+
+		if ( (strcmp(token,"TV_LOGIN") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->tv_login, val);
+			continue;
+		}
+
+		if ( (strcmp(token,"TV_PASS") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->tv_pass, val);
+			continue;
+		}
+
+		if ( (strcmp(token,"TV_START") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->tv_start, val);
+			continue;
+		}
+
+		if ( (strcmp(token,"TV_OFF") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->tv_off, val);
+			continue;
+		}
+
 		if ( (strcmp(token,"TV_SAMSUNG_PORT") == 0) && (strlen(val) != 0) )
 		{
 			config->tv_port = atoi(val);
@@ -1950,6 +2133,41 @@ static int makeTimer(char *name, timer_t *timerID, int expireMS, int intervalMS 
 }
 
 
+// on/off TV
+
+int tvManager(char *option)
+{
+
+    signal(SIGCHLD, SIG_IGN); // don't wait for children
+    int forked = fork();
+
+    if (forked == 0)
+    {
+
+	// only tv on
+	if (strcmp(option,"TVON")==0)
+	{
+	    RPC_SSHdo(config.tv_start, config.tv_smart, config.tv_login, config.tv_pass);
+	}
+
+	// only tv off
+	if (strcmp(option,"TVOFF")==0)
+	{
+	    RPC_SSHdo(config.tv_off, config.tv_smart, config.tv_login, config.tv_pass);
+	}
+
+	// set channel to TV
+	if (strcmp(option,"TVKEYTV")==0)
+	{
+	    std::string skey = "KEY_TV";
+	    tvRemote(skey, "192.168.0.1", config.tv_ip);
+	}
+
+	_exit(3);
+    }
+
+}
+
 //-----------------------------------------------------------------------------
 // <main>
 // Create the driver and then wait
@@ -2122,6 +2340,24 @@ printf("Going ...\n");
 		{
 		    bool res = setValue(g_homeId,config.valve_node,0);
                     printf("VALVE OFF = NODE %d \n",config.valve_node, res);
+		}
+
+		if (trim(data.c_str()) == "TVOFF")
+		{
+		    tvManager("TVOFF");
+                    printf("TV OFF\n");
+		}
+
+		if (trim(data.c_str()) == "TVON")
+		{
+		    tvManager("TVON");
+                    printf("TVON\n");
+		}
+
+		if (trim(data.c_str()) == "TVKEYTV")
+		{
+		    tvManager("TVKEYTV");
+                    printf("TVKEYTV\n");
 		}
 
 		if (trim(data.substr(0,7).c_str()) == "POWERON")
