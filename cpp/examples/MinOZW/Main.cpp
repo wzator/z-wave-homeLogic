@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20140116
+//	Main.cpp v0.20140728
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -906,6 +906,91 @@ bool setValue (int32 home, int32 node, int32 value)
 	}
 
     return response;
+}
+
+
+/* TV MANAGER ************************************* */
+
+// on/off TV
+
+int tvManager(char *option, char *keys)
+{
+
+    signal(SIGCHLD, SIG_IGN); // don't wait for children
+    int forked = fork();
+
+    if (forked == 0)
+    {
+
+	// only tv on
+	if (strcmp(option,"TVON")==0)
+	{
+	    RPC_SSHdo(config.tv_start, config.tv_smart, config.tv_login, config.tv_pass);
+	}
+
+	// only tv off
+	if (strcmp(option,"TVOFF")==0)
+	{
+	    RPC_SSHdo(config.tv_off, config.tv_smart, config.tv_login, config.tv_pass);
+	}
+
+	// set channel to TV
+	if (strcmp(option,"TVKEYTV")==0)
+	{
+	    std::string skey = "KEY_TV";
+	    tvRemote(skey, "192.168.0.1", config.tv_ip);
+	}
+
+	if (strcmp(option,"POWERON")==0)
+	{
+	    RPC_SSHdo(config.tv_start, config.tv_smart, config.tv_login, config.tv_pass);
+
+	    signal(SIGCHLD, SIG_IGN); // don't wait for children
+	    int forked2 = fork();
+	    if (forked2 == 0)
+	    {
+		sleep(7); /* CEC sloooow */
+		if (strlen(keys)>2)
+	        {
+	    	    char *p = strtok(keys,";");
+		    while (p != NULL)
+		    {
+			std::string skey = p;
+
+			tvRemote(skey, "192.168.0.1", config.tv_ip);
+		        p = strtok(NULL, ";");
+		    }
+
+		}
+	    }
+	}
+
+	if (strcmp(option,"POWEROFF")==0)
+	{
+	    RPC_SSHdo(config.tv_off, config.tv_smart, config.tv_login, config.tv_pass);
+
+	    signal(SIGCHLD, SIG_IGN); // don't wait for children
+	    int forked2 = fork();
+	    if (forked2 == 0)
+	    {
+		sleep(7); /* CEC sloooow */
+		if (strlen(keys)>2)
+	        {
+		    char *p = strtok(keys,";");
+		    while (p != NULL)
+		    {
+			std::string skey = p;
+
+			tvRemote(skey, "192.168.0.1", config.tv_ip);
+			p = strtok(NULL, ";");
+		    }
+		}
+	    }
+	}
+
+	_exit(3);
+    }
+
 }
 
 
@@ -2101,6 +2186,38 @@ timerHandler(sigval_t t )
     	}
     }
 
+ /////////////////////////////////////
+
+
+    sprintf(query,"SELECT tv_no,tv_action,tv_keys,tv_id FROM tv WHERE ((HOUR(NOW()) > tv_hour ) OR (tv_hour = HOUR(NOW()) AND MINUTE(NOW()) >= tv_minutes)) AND tv_weekday = WEEKDAY(NOW())+1 AND (tv_lastaction != DATE(NOW()) OR tv_lastaction IS NULL) AND tv.tv_active = 1");
+
+        if(mysql_query(&mysql, query))
+        {
+                printf("Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+	}
+	else
+	{
+	    result = mysql_store_result(&mysql);
+	    num_rows = mysql_num_rows(result);
+	    if (num_rows > 0)
+	    {
+		while ((row = mysql_fetch_row(result)))
+	        {
+		    printf("TVNODE %d SET VALUE %s WITH KEYS %s\n",atoi(row[0]), row[1], row[2]);
+		    tvManager(row[1],row[2]);
+		    sprintf(query,"UPDATE tv SET tv_lastaction = NOW() WHERE tv_id = %d LIMIT 1", atoi(row[3]));
+	            mysql_query(&mysql,query);
+		}
+	    }
+	    else
+	    {
+		printf("TIMER: [TV] Nothing to do\n");
+	    }
+
+	    mysql_free_result(result);
+	}
+
+
         pthread_mutex_unlock(&g_criticalSection);
 
 
@@ -2133,40 +2250,6 @@ static int makeTimer(char *name, timer_t *timerID, int expireMS, int intervalMS 
 }
 
 
-// on/off TV
-
-int tvManager(char *option)
-{
-
-    signal(SIGCHLD, SIG_IGN); // don't wait for children
-    int forked = fork();
-
-    if (forked == 0)
-    {
-
-	// only tv on
-	if (strcmp(option,"TVON")==0)
-	{
-	    RPC_SSHdo(config.tv_start, config.tv_smart, config.tv_login, config.tv_pass);
-	}
-
-	// only tv off
-	if (strcmp(option,"TVOFF")==0)
-	{
-	    RPC_SSHdo(config.tv_off, config.tv_smart, config.tv_login, config.tv_pass);
-	}
-
-	// set channel to TV
-	if (strcmp(option,"TVKEYTV")==0)
-	{
-	    std::string skey = "KEY_TV";
-	    tvRemote(skey, "192.168.0.1", config.tv_ip);
-	}
-
-	_exit(3);
-    }
-
-}
 
 //-----------------------------------------------------------------------------
 // <main>
@@ -2344,19 +2427,19 @@ printf("Going ...\n");
 
 		if (trim(data.c_str()) == "TVOFF")
 		{
-		    tvManager("TVOFF");
+		    tvManager("TVOFF","");
                     printf("TV OFF\n");
 		}
 
 		if (trim(data.c_str()) == "TVON")
 		{
-		    tvManager("TVON");
+		    tvManager("TVON","");
                     printf("TVON\n");
 		}
 
 		if (trim(data.c_str()) == "TVKEYTV")
 		{
-		    tvManager("TVKEYTV");
+		    tvManager("TVKEYTV","");
                     printf("TVKEYTV\n");
 		}
 
