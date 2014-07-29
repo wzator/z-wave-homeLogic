@@ -274,7 +274,7 @@ int ping(char *adress)
         bzero(&pckt, sizeof(pckt));
         pckt.hdr.type = ICMP_ECHO;
         pckt.hdr.un.echo.id = pid;
-        for ( i = 0; i < sizeof(pckt.msg)-1; i++ )
+        for (i = 0; i < sizeof(pckt.msg)-1; i++ )
             pckt.msg[i] = i+'0';
         pckt.msg[i] = 0;
         pckt.hdr.un.echo.sequence = cnt++;
@@ -913,7 +913,7 @@ bool setValue (int32 home, int32 node, int32 value)
 
 // on/off TV
 
-int tvManager(char *option, char *keys)
+int tvManager(char *option, char *mkeys)
 {
 
     signal(SIGCHLD, SIG_IGN); // don't wait for children
@@ -921,6 +921,9 @@ int tvManager(char *option, char *keys)
 
     if (forked == 0)
     {
+	char keys[1024];
+	
+	sprintf(keys,"%s",mkeys);
 
 	// only tv on
 	if (strcmp(option,"TVON")==0)
@@ -945,13 +948,10 @@ int tvManager(char *option, char *keys)
 	{
 	    RPC_SSHdo(config.tv_start, config.tv_smart, config.tv_login, config.tv_pass);
 
-	    signal(SIGCHLD, SIG_IGN); // don't wait for children
-	    int forked2 = fork();
-	    if (forked2 == 0)
-	    {
-		sleep(7); /* CEC sloooow */
+
 		if (strlen(keys)>2)
 	        {
+    		    sleep(15); /* CEC sloooow */
 	    	    char *p = strtok(keys,";");
 		    while (p != NULL)
 		    {
@@ -962,20 +962,15 @@ int tvManager(char *option, char *keys)
 		    }
 
 		}
-	    }
 	}
 
 	if (strcmp(option,"POWEROFF")==0)
 	{
 	    RPC_SSHdo(config.tv_off, config.tv_smart, config.tv_login, config.tv_pass);
 
-	    signal(SIGCHLD, SIG_IGN); // don't wait for children
-	    int forked2 = fork();
-	    if (forked2 == 0)
-	    {
-		sleep(7); /* CEC sloooow */
 		if (strlen(keys)>2)
 	        {
+		    sleep(15); /* CEC sloooow */
 		    char *p = strtok(keys,";");
 		    while (p != NULL)
 		    {
@@ -985,7 +980,6 @@ int tvManager(char *option, char *keys)
 			p = strtok(NULL, ";");
 		    }
 		}
-	    }
 	}
 
 	_exit(3);
