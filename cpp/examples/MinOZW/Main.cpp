@@ -274,7 +274,7 @@ int ping(char *adress)
         bzero(&pckt, sizeof(pckt));
         pckt.hdr.type = ICMP_ECHO;
         pckt.hdr.un.echo.id = pid;
-        for (i = 0; i < sizeof(pckt.msg)-1; i++ )
+        for (i = 0; i < (int) sizeof(pckt.msg)-1; i++ )
             pckt.msg[i] = i+'0';
         pckt.msg[i] = 0;
         pckt.hdr.un.echo.sequence = cnt++;
@@ -471,7 +471,7 @@ char *tozero(char *string)
     char mem[1024];
     sprintf(mem,"%s",string);
     int counter = 0;
-    for (int a=0; a<strlen(mem); a++)
+    for (int a=0; a < (int) strlen(mem); a++)
     {
 	if ((unsigned char)mem[a] == 0xff)
 	{
@@ -497,8 +497,6 @@ int tvRemote(std::string skey, std::string myip, std::string remoteip)
     struct	hostent *server;
     char	buffer[1024];
     char	host[NI_MAXHOST];
-    char	message[1024];
-    char	part[2048];
     int		family;
 
     portno = 55000;
@@ -643,7 +641,7 @@ int show_remote_processes(ssh_session session, const char *command)
     nbytes = channel_read(channel, buffer, sizeof(buffer), 0);
     while (nbytes > 0)
     {
-        if (write(1, buffer, nbytes) != nbytes)
+        if (write(1, buffer, nbytes) != (int) nbytes)
 	{
             channel_close(channel);
     	    channel_free(channel);
@@ -673,7 +671,6 @@ int verify_knownhost(ssh_session session)
     int state, hlen;
     unsigned char *hash = NULL;
     char *hexa;
-    char buf[10];
 
     state = ssh_is_server_known(session);
     hlen = ssh_get_pubkey_hash(session, &hash);
@@ -772,6 +769,8 @@ int RPC_SSHdo(const char *command, const char *cfg_host, const char *cfg_login, 
     show_remote_processes(my_ssh_session, command);
     ssh_disconnect(my_ssh_session);
     ssh_free(my_ssh_session);
+
+    return 0;
 }
 
 
@@ -984,6 +983,8 @@ int tvManager(char *option, char *mkeys)
 
 	_exit(3);
     }
+
+    return 0;
 
 }
 
@@ -1211,7 +1212,6 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 	char startedQry[32];
 	int myNodes[100][4];
 	MYSQL_RES *result;
-        int num_fields;
         MYSQL_ROW row;
 
 	// Instance can never be zero, we need to be backwards compatible
@@ -1326,7 +1326,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 		{
 		    sprintf(query,"UPDATE zonesLights SET startedQry = %s WHERE id = %d LIMIT 1",startedQry,myNodes[a][1]);
 		    mysql_query(&mysql,query);
-		    bool res = setValue(g_homeId,myNodes[a][0],atoi(dev_value));
+		    setValue(g_homeId,myNodes[a][0],atoi(dev_value));
 		    printf("zonesLights SET %d = %d\n",myNodes[a][0],atoi(dev_value));
 		}
 	    }
@@ -2117,7 +2117,7 @@ timerHandler(sigval_t t )
 		while ((row = mysql_fetch_row(result)))
 	        {
 		    printf("POWERNODE %d SET VALUE %d\n",atoi(row[0]),atoi(row[1]));
-		    bool res = setValue(g_homeId,atoi(row[0]),atoi(row[1]));
+		    setValue(g_homeId,atoi(row[0]),atoi(row[1]));
 		}
 	    }
 	    else
@@ -2145,7 +2145,7 @@ timerHandler(sigval_t t )
 		while ((row = mysql_fetch_row(result)))
 	        {
 		    printf("THERMONODE %d SET VALUE %d\n",atoi(row[0]),atoi(row[1]));
-		    bool res = setPoint(g_homeId,atoi(row[0]),row[1]);
+		    setPoint(g_homeId,atoi(row[0]),row[1]);
 		}
 	    }
 	    else
@@ -2421,19 +2421,19 @@ printf("Going ...\n");
 
 		if (trim(data.c_str()) == "TVOFF")
 		{
-		    tvManager("TVOFF","");
+		    tvManager((char *) "TVOFF",(char *) "");
                     printf("TV OFF\n");
 		}
 
 		if (trim(data.c_str()) == "TVON")
 		{
-		    tvManager("TVON","");
+		    tvManager((char *) "TVON",(char *) "");
                     printf("TVON\n");
 		}
 
 		if (trim(data.c_str()) == "TVKEYTV")
 		{
-		    tvManager("TVKEYTV","");
+		    tvManager((char *) "TVKEYTV",(char *) "");
                     printf("TVKEYTV\n");
 		}
 
