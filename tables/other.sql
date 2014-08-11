@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS `other`;
+CREATE TABLE IF NOT EXISTS `other` (
+  `object` varchar(8) NOT NULL,
+  `status` int(11) DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`object`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;

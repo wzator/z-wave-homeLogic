@@ -1,0 +1,26 @@
+DROP TABLE IF EXISTS `data`;
+CREATE TABLE IF NOT EXISTS `data` (
+  `timestamp` bigint(14) NOT NULL DEFAULT '0',
+  `rec_date` date NOT NULL DEFAULT '0000-00-00',
+  `rec_time` time NOT NULL DEFAULT '00:00:00',
+  `temp_in` decimal(3,1) NOT NULL DEFAULT '0.0',
+  `temp_out` decimal(3,1) DEFAULT '0.0',
+  `dewpoint` decimal(3,1) DEFAULT '0.0',
+  `rel_hum_in` tinyint(3) NOT NULL DEFAULT '0',
+  `rel_hum_out` tinyint(3) DEFAULT '0',
+  `windspeed` decimal(3,1) NOT NULL DEFAULT '0.0',
+  `wind_direction` char(3) NOT NULL DEFAULT '',
+  `wind_angle` decimal(3,1) NOT NULL DEFAULT '0.0',
+  `wind_chill` decimal(3,1) NOT NULL DEFAULT '0.0',
+  `rain_1h` decimal(5,1) NOT NULL DEFAULT '0.0',
+  `rain_24h` decimal(5,1) NOT NULL DEFAULT '0.0',
+  `rain_1w` decimal(6,1) NOT NULL DEFAULT '0.0',
+  `rain_1m` decimal(6,1) NOT NULL DEFAULT '0.0',
+  `rain_total` decimal(7,1) NOT NULL DEFAULT '0.0',
+  `rel_pressure` decimal(7,1) NOT NULL DEFAULT '0.0',
+  `abs_pressure` decimal(7,1) NOT NULL DEFAULT '0.0',
+  `tendency` varchar(10) NOT NULL DEFAULT '',
+  `forecast` varchar(7) NOT NULL DEFAULT '',
+  UNIQUE KEY `timestamp` (`timestamp`),
+  KEY `rec_date` (`rec_date`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
