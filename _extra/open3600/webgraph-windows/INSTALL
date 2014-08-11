@@ -1,0 +1,10 @@
+You need a webserver with a recent version of PHP including graphical library GD.
+
+A windows scheduler job must fetch data from the station for example every 10 minutes
+
+In the scheduler add an entry that will run every 10 minutes (assuming that the package is installed in c:\Apache\Apache2\htdocs\graph)
+with the following command; "c:\Apache\Apache2\htdocs\graph\log3600.exe c:\Apache\Apache2\htdocs\graph\log3600.log"
+
+This adds a line of data to c:\Apache\Apache2\htdocs\graph\log3600.log every 10 minutes.
+
+Place all the files from this package in a directory on your web server.

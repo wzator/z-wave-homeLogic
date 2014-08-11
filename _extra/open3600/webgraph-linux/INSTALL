@@ -1,0 +1,11 @@
+You need a webserver with a recent version of PHP including graphical library GD.
+
+A cronjob must fetch data from the station for example every 10 minutes
+
+In /etc/crontab add this line that will run every 10 minutes (assuming that log3600 is installed in /var/www/graph)
+*/10 * * * * /var/www/graph/log3600 /var/www/graph/log3600.log
+
+This adds a line of data to /var/www/graph/log3600.log every 10 minutes.
+Make sure that the file is world readable.
+
+Place all the files from this package in a directory on your web server.
