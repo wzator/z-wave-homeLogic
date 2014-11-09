@@ -860,6 +860,54 @@ bool setPoint (int32 home, int32 node, string int_value)
 
 }
 
+bool setValueByInstance (int32 home, int32 node, int32 value, int32 instance)
+{
+	bool response = 0;
+	bool bool_value;
+
+	if ( NodeInfo* nodeInfo = GetNodeInfo( home, node ) )
+	{
+		for ( list<ValueID>::iterator it = nodeInfo->m_values.begin(); it != nodeInfo->m_values.end(); ++it )
+		{
+			int id = (*it).GetCommandClassId();
+			int inst = (*it).GetInstance();
+			if ( (id == 0x25 || id == 0x28 || id == 0x20) && instance == inst )
+			{
+				if ( ValueID::ValueType_Bool == (*it).GetType() )
+				{
+				    bool_value = (bool)value;
+				    response = Manager::Get()->SetValue( *it, bool_value );
+				}
+				else if ( ValueID::ValueType_Byte == (*it).GetType() )
+				{
+				    uint8 uint8_value = (uint8)value;
+				    response = Manager::Get()->SetValue( *it, uint8_value );
+				}
+				else if ( ValueID::ValueType_Short == (*it).GetType() )
+				{
+				    uint16 uint16_value = (uint16)value;
+				    response = Manager::Get()->SetValue( *it, uint16_value );
+				}
+				else if ( ValueID::ValueType_Int == (*it).GetType() )
+				{
+				    int int_value = value;
+				    response = Manager::Get()->SetValue( *it, int_value );
+				}
+				else if ( ValueID::ValueType_List == (*it).GetType() )
+				{
+				    response = Manager::Get()->SetValue( *it, value );
+				}
+				
+				printf("SetvalueByInstance(%d:%d:%d) type: %d \n", response, inst,id, (*it).GetType());
+			}
+		}
+
+	}
+
+    return response;
+
+}
+
 bool setValue (int32 home, int32 node, int32 value)
 {
 	bool response = 0;
