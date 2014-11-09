@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20140728
+//	Main.cpp v0.20141109
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -113,7 +113,7 @@ struct config_type
 	int    alarm_node;
 	int    light_node;
 	int    power_node[255];
-	int    valve_node;
+	int    valve_node[255];
 	int    door_node;
 	char   tv_ip[64];
 	char   tv_smart[64];
@@ -945,7 +945,7 @@ bool setValue (int32 home, int32 node, int32 value)
 				{
 				    response = Manager::Get()->SetValue( *it, value );
 				}
-
+				
 				printf("Setvalue(%d:%d:%d) type: %d \n", response, inst,id, (*it).GetType());
 			}
 		}
@@ -1912,6 +1912,25 @@ int get_configuration(struct config_type *config, char *path)
 		}
 
 		memset(tmp,0,99);
+		strncpy(tmp,token,16);
+		if ( (strcmp(tmp,"ZWAVE_VALVE_NODE") == 0) && (strlen(val) != 0) )
+		{
+		    memset(tmp,0,99);
+		    strncpy(tmp,token+16,strlen(token)-16);
+
+			if (strlen(tmp)>0)
+			{
+			    int p = atoi(tmp);
+			    if (p>0)
+			    {
+				config->valve_node[p] = atoi(val);
+			    }
+			}
+			continue;
+		}
+
+
+		memset(tmp,0,99);
 		strncpy(tmp,token,13);
 		if ( (strcmp(tmp,"ZWAVE_DYNAMIC") == 0) && (strlen(val) != 0) )
 		{
@@ -1941,12 +1960,6 @@ int get_configuration(struct config_type *config, char *path)
 		if ( (strcmp(token,"ZWAVE_DOOR_NODE") == 0) && (strlen(val) != 0) )
 		{
 			config->door_node = atoi(val);
-			continue;
-		}
-
-		if ( (strcmp(token,"ZWAVE_VALVE_NODE") == 0) && (strlen(val) != 0) )
-		{
-			config->valve_node = atoi(val);
 			continue;
 		}
 
@@ -2454,7 +2467,7 @@ printf("Going ...\n");
 		    bool res = setValue(g_homeId,config.light_node,0);
                     printf("LIGHT OFF = NODE %d \n",config.light_node, res);
 		}
-
+/*
 		if (trim(data.c_str()) == "VALVEON1")
 		{
 		     bool res = setValue(g_homeId,config.valve_node,255);
@@ -2466,6 +2479,45 @@ printf("Going ...\n");
 		    bool res = setValue(g_homeId,config.valve_node,0);
                     printf("VALVE OFF = NODE %d \n",config.valve_node, res);
 		}
+*/
+		if (trim(data.substr(0,8).c_str()) == "VALVEOFF")
+		{
+
+		    string tmp = data.substr(8,data.length()-8);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int mynode = strtol(tmp.c_str(),&garbage,0);
+		        if (mynode > 0 && mynode < 255)
+		        {
+			    if (config.valve_node[mynode] > 0)
+			    {
+				bool res = setValue(g_homeId,config.valve_node[mynode],0);
+                	        printf("VALVE OFF = NODE %d \n",config.valve_node[mynode], res);
+                	    }
+                	}
+                    }
+		}
+
+		if (trim(data.substr(0,7).c_str()) == "VALVEON")
+		{
+
+		    string tmp = data.substr(7,data.length()-7);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int mynode = strtol(tmp.c_str(),&garbage,0);
+		        if (mynode > 0 && mynode < 255)
+		        {
+			    if (config.valve_node[mynode] > 0)
+			    {
+				bool res = setValue(g_homeId,config.valve_node[mynode],255);
+                	        printf("VALVE ON = NODE %d \n",config.valve_node[mynode], res);
+                	    }
+                	}
+                    }
+		}
+
 
 		if (trim(data.c_str()) == "TVOFF")
 		{
