@@ -2592,15 +2592,84 @@ printf("Going ...\n");
 		        Manager::Get()->WriteConfig(g_homeId);
 		}
 
-		if (trim(data.c_str()) == "DELROUTE9")
+		if (trim(data.substr(0,8).c_str()) == "DELROUTE")
 		{
-		    Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_DeleteAllReturnRoutes, OnControllerUpdate, NULL, true, 9, 0 );
+		    string tmp = data.substr(8,data.length()-8);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int mynode = strtol(tmp.c_str(),&garbage,0);
+		        if (mynode > 0)
+				Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_DeleteAllReturnRoutes, OnControllerUpdate, NULL, true, mynode, 0 );
+		    }
 		}
 
-		if (trim(data.c_str()) == "NEWROUTE9")
+		// NEWROUTE2,4 -> Node 2 to node 4
+		if (trim(data.substr(0,8).c_str()) == "NEWROUTE")
 		{
-		    Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_AssignReturnRoute, OnControllerUpdate, NULL, true, 9, 6 );
+		    string tmp = data.substr(8,data.length()-8);
+		    if (tmp.length() > 0)
+		    {
+			    int nodeF	= 0;
+			    int nodeT	= 0;
+			    sscanf(tmp.c_str(), "%d,%d", &nodeF, &nodeT);
+		        if (nodeF > 0 && nodeT > 0)
+			    Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_AssignReturnRoute, OnControllerUpdate, NULL, true, nodeF, nodeT );
+		    }
 		}
+
+		// CONF2,27,18 -> Node 2, Parameter 27, Value 18
+		if (trim(data.substr(0,4).c_str()) == "CONF")
+		{
+			string tmp = data.substr(4,data.length()-4);
+
+    			if (tmp.length() > 0)
+			{
+			    int node	= 0;
+			    int par	= 0;
+			    int valpar	= 0;
+			    sscanf(tmp.c_str(), "%d,%d,%d", &node, &par, &valpar);
+        	    	    pthread_mutex_lock(&g_criticalSection);
+				Manager::Get()->SetConfigParam(g_homeId, node, par, valpar);
+			    pthread_mutex_unlock(&g_criticalSection);
+
+		    	    printf("Node %d Parameter %d to %d\n",node,par,valpar);
+			}
+		}
+
+		// BASICI2,18,4 -> Node 2, Value 18, Instance 4 -> Send only to instance
+		if (trim(data.substr(0,6).c_str()) == "BASICI")
+		{
+			string tmp = data.substr(6,data.length()-6);
+
+    			if (tmp.length() > 0)
+			{
+			    int node	= 0;
+			    int valpar	= 0;
+			    int instance= 0;
+			    sscanf(tmp.c_str(), "%d,%d,%d", &node, &valpar, &instance);
+				setValueByInstance(g_homeId,node,valpar,instance);
+                	        printf("BASICI = NODE %d SET %d \n",node, valpar);
+
+			}
+		}
+
+		// BASICA2,18 -> Node 2, Value 18 -> Send to all instances
+		if (trim(data.substr(0,6).c_str()) == "BASICA")
+		{
+			string tmp = data.substr(6,data.length()-6);
+
+    			if (tmp.length() > 0)
+			{
+			    int node	= 0;
+			    int valpar	= 0;
+			    sscanf(tmp.c_str(), "%d,%d", &node, &valpar);
+				setValue(g_homeId,node,valpar);
+                	        printf("BASICA = NODE %d SET %d \n",node, valpar);
+
+			}
+		}
+
 
 		if (trim(data.c_str()) == "SET")
 		{
