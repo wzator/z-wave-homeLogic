@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20141109
+//	Main.cpp v0.20141116
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -2560,6 +2560,18 @@ printf("Going ...\n");
                 	    }
                 	}
                     }
+		}
+
+		if (trim(data.substr(0,5).c_str()) == "STATE")
+		{
+		    string tmp = data.substr(5,data.length()-5);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int mynode = strtol(tmp.c_str(),&garbage,0);
+		        if (mynode > 0)
+				Manager::Get()->RequestNodeState( g_homeId, mynode );
+		    }
 		}
 
 
