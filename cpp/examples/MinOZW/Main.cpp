@@ -2467,19 +2467,7 @@ printf("Going ...\n");
 		    bool res = setValue(g_homeId,config.light_node,0);
                     printf("LIGHT OFF = NODE %d \n",config.light_node, res);
 		}
-/*
-		if (trim(data.c_str()) == "VALVEON1")
-		{
-		     bool res = setValue(g_homeId,config.valve_node,255);
-                    printf("VALVE ON = NODE %d : %d\n",config.valve_node, res);
-		}
 
-		if (trim(data.c_str()) == "VALVEOFF1")
-		{
-		    bool res = setValue(g_homeId,config.valve_node,0);
-                    printf("VALVE OFF = NODE %d \n",config.valve_node, res);
-		}
-*/
 		if (trim(data.substr(0,8).c_str()) == "VALVEOFF")
 		{
 
