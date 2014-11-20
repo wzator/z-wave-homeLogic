@@ -860,10 +860,67 @@ bool setPoint (int32 home, int32 node, string int_value)
 
 }
 
-bool setValueByInstance (int32 home, int32 node, int32 value, int32 instance)
+bool setValueByAll ( int32 home, int32 node, int32 myid, int32 instance, int32 myindex, const void *myvalue )
 {
 	bool response = 0;
 	bool bool_value;
+	int value = *(int*) myvalue;
+
+	if ( NodeInfo* nodeInfo = GetNodeInfo( home, node ) )
+	{
+		for ( list<ValueID>::iterator it = nodeInfo->m_values.begin(); it != nodeInfo->m_values.end(); ++it )
+		{
+			int id = (*it).GetCommandClassId();
+			int inst = (*it).GetInstance();
+			int index = (*it).GetIndex();
+
+
+			printf("%d,%d,%d = %d\n",id,inst,index,(*it).GetType());
+			if ( id == myid && instance == inst && index == myindex )
+			{
+				if ( ValueID::ValueType_Bool == (*it).GetType() )
+				{
+				    bool_value = (bool)value;
+				    response = Manager::Get()->SetValue( *it, bool_value );
+				}
+				else if ( ValueID::ValueType_Byte == (*it).GetType() )
+				{
+				    uint8 uint8_value = (uint8)value;
+				    response = Manager::Get()->SetValue( *it, uint8_value );
+				}
+				else if ( ValueID::ValueType_Short == (*it).GetType() )
+				{
+				    uint16 uint16_value = (uint16)value;
+				    response = Manager::Get()->SetValue( *it, uint16_value );
+				}
+				else if ( ValueID::ValueType_Int == (*it).GetType() )
+				{
+				    int int_value = value;
+				    response = Manager::Get()->SetValue( *it, int_value );
+				}
+				else if ( ValueID::ValueType_List == (*it).GetType() )
+				{
+				    const char* mvalue = (char*)myvalue;
+				    std::string mvalue1 = std::string(mvalue);
+				    response = Manager::Get()->SetValueListSelection( *it , mvalue1);
+				}
+				
+				printf("SetvalueByAll(%d:%d:%d) type: %d \n", response, inst,id, (*it).GetType());
+			}
+		}
+
+	}
+
+    return response;
+
+}
+
+
+bool setValueByInstance (int32 home, int32 node, const void *myvalue, int32 instance)
+{
+	bool response = 0;
+	bool bool_value;
+	int value = *(int*) myvalue;
 
 	if ( NodeInfo* nodeInfo = GetNodeInfo( home, node ) )
 	{
@@ -895,7 +952,9 @@ bool setValueByInstance (int32 home, int32 node, int32 value, int32 instance)
 				}
 				else if ( ValueID::ValueType_List == (*it).GetType() )
 				{
-				    response = Manager::Get()->SetValue( *it, value );
+				    const char* mvalue = (char*)myvalue;
+				    std::string mvalue1 = std::string(mvalue);
+				    response = Manager::Get()->SetValueListSelection( *it , mvalue1);
 				}
 				
 				printf("SetvalueByInstance(%d:%d:%d) type: %d \n", response, inst,id, (*it).GetType());
@@ -2649,6 +2708,49 @@ printf("Going ...\n");
 			}
 		}
 
+		// COMMS2,18,4,0,Off -> Node 2, Value 18, Instance 4, Index 0, value = Off -> Send only to instance
+		if (trim(data.substr(0,5).c_str()) == "COMMS")
+		{
+			string tmp = data.substr(5,data.length()-5);
+
+    			if (tmp.length() > 0)
+			{
+			    int node	= 0;
+			    char *valpar[256];
+			    int instance= 0;
+			    int id	= 0;
+			    int index	= 0;
+
+			    sscanf(tmp.c_str(), "%d,%d,%d,%d,%s", &node, &id, &instance, &index, valpar);
+				setValueByAll(g_homeId, node, id, instance, index, &valpar);
+
+                	        printf("COMMS = NODE %d CLASS %d INSTANCE %d INDEX %d SET %s \n",node, id, instance, index, valpar);
+
+			}
+		}
+
+		// COMMI2,18,4,0,5 -> Node 2, Value 18, Instance 4, Index 0, value = 5 -> Send only to instance
+		if (trim(data.substr(0,5).c_str()) == "COMMI")
+		{
+			string tmp = data.substr(5,data.length()-5);
+
+    			if (tmp.length() > 0)
+			{
+			    int node	= 0;
+			    char valpar = 0;
+			    int instance= 0;
+			    int id	= 0;
+			    int index	= 0;
+
+			    sscanf(tmp.c_str(), "%d,%d,%d,%d,%d", &node, &id, &instance, &index, &valpar);
+				setValueByAll(g_homeId, node, id, instance, index, &valpar);
+
+                	        printf("COMMI = NODE %d CLASS %d INSTANCE %d INDEX %d SET %d \n",node, id, instance, index, valpar);
+
+			}
+		}
+
+
 		// BASICI2,18,4 -> Node 2, Value 18, Instance 4 -> Send only to instance
 		if (trim(data.substr(0,6).c_str()) == "BASICI")
 		{
@@ -2660,7 +2762,7 @@ printf("Going ...\n");
 			    int valpar	= 0;
 			    int instance= 0;
 			    sscanf(tmp.c_str(), "%d,%d,%d", &node, &valpar, &instance);
-				setValueByInstance(g_homeId,node,valpar,instance);
+				setValueByInstance(g_homeId,node,&valpar,instance);
                 	        printf("BASICI = NODE %d SET %d \n",node, valpar);
 
 			}
