@@ -2331,6 +2331,34 @@ timerHandler(sigval_t t )
 	    mysql_free_result(result);
 	}
 
+ /////////////////////////////////////
+
+    sprintf(query,"SELECT node FROM `stateGet` where NOW() > DATE_ADD(lastupdate, INTERVAL updateEveryMinutes MINUTE)");
+
+        if(mysql_query(&mysql, query))
+        {
+                printf("Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+	}
+	else
+	{
+	    result = mysql_store_result(&mysql);
+	    num_rows = mysql_num_rows(result);
+	    if (num_rows > 0)
+	    {
+		while ((row = mysql_fetch_row(result)))
+	        {
+		    printf("NODE %d REFRESH NOW\n",atoi(row[0]));
+		    Manager::Get()->RequestNodeState( g_homeId, atoi(row[0]) );
+		    sprintf(query,"UPDATE stateGet SET lastupdate = NOW() WHERE node = %d LIMIT 1", atoi(row[0]));
+	            mysql_query(&mysql,query);
+		}
+	    }
+	    else
+	    {
+		printf("TIMER: [STATE] Nothing to do\n");
+	    }
+
+	}
 
         pthread_mutex_unlock(&g_criticalSection);
 
