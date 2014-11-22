@@ -912,7 +912,7 @@ bool setValueByAll ( int32 home, int32 node, int32 myid, int32 instance, int32 m
 				    response = Manager::Get()->SetValueListSelection( *it , mvalue1);
 				}
 				
-				printf("SetvalueByAll(%d:%d:%d) type: %d \n", response, inst,id, (*it).GetType());
+				printf("SetvalueByAll(%d:%d:%d) type: %d value %d \n", response, inst,id, (*it).GetType(), value);
 			}
 		}
 
