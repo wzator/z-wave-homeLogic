@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20141120
+//	Main.cpp v0.20141116
 //
 //	Based on minimal application to test OpenZWave.
 //
