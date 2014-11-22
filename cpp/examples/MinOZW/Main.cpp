@@ -864,7 +864,7 @@ bool setValueByAll ( int32 home, int32 node, int32 myid, int32 instance, int32 m
 {
 	bool response = 0;
 	bool bool_value;
-	int value = *(int*) myvalue;
+	int32 value = *(int*) myvalue;
 
 	if ( NodeInfo* nodeInfo = GetNodeInfo( home, node ) )
 	{
