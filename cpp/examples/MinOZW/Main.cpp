@@ -888,6 +888,13 @@ bool setValueByAll ( int32 home, int32 node, int32 myid, int32 instance, int32 m
 				    uint8 uint8_value = (uint8)value;
 				    response = Manager::Get()->SetValue( *it, uint8_value );
 				}
+				else if ( ValueID::ValueType_Decimal == (*it).GetType() )
+				{
+				    string tmp;
+				    sprintf((char*)tmp.c_str(), "%d", value);
+				    string decimal = tmp.c_str();
+				    response = Manager::Get()->SetValue( *it, decimal );
+				}
 				else if ( ValueID::ValueType_Short == (*it).GetType() )
 				{
 				    uint16 uint16_value = (uint16)value;
@@ -940,6 +947,13 @@ bool setValueByInstance (int32 home, int32 node, const void *myvalue, int32 inst
 				    uint8 uint8_value = (uint8)value;
 				    response = Manager::Get()->SetValue( *it, uint8_value );
 				}
+				else if ( ValueID::ValueType_Decimal == (*it).GetType() )
+				{
+				    string tmp;
+				    sprintf((char*)tmp.c_str(), "%d", value);
+				    string decimal = tmp.c_str();
+				    response = Manager::Get()->SetValue( *it, decimal );
+				}
 				else if ( ValueID::ValueType_Short == (*it).GetType() )
 				{
 				    uint16 uint16_value = (uint16)value;
@@ -989,6 +1003,13 @@ bool setValue (int32 home, int32 node, int32 value)
 				{
 				    uint8 uint8_value = (uint8)value;
 				    response = Manager::Get()->SetValue( *it, uint8_value );
+				}
+				else if ( ValueID::ValueType_Decimal == (*it).GetType() )
+				{
+				    string tmp;
+				    sprintf((char*)tmp.c_str(), "%d", value);
+				    string decimal = tmp.c_str();
+				    response = Manager::Get()->SetValue( *it, decimal );
 				}
 				else if ( ValueID::ValueType_Short == (*it).GetType() )
 				{
