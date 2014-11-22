@@ -2765,15 +2765,22 @@ printf("Going ...\n");
     			if (tmp.length() > 0)
 			{
 			    int node	= 0;
-			    char *valpar[256];
+			    char valpar[256];
 			    int instance= 0;
 			    int id	= 0;
 			    int index	= 0;
+			    int size	= 0;
 
-			    sscanf(tmp.c_str(), "%d,%d,%d,%d,%s", &node, &id, &instance, &index, valpar);
+			    sscanf(tmp.c_str(), "%d,%d,%d,%d,%[^\t\n]", &node, &id, &instance, &index, valpar);
+			    size = strnlen((const char*)valpar,255);
+			    if (size > 1)
+			    {
+				valpar[size-1]=0;
+			    }
+		
 				setValueByAll(g_homeId, node, id, instance, index, &valpar);
 
-                	        printf("COMMS = NODE %d CLASS %d INSTANCE %d INDEX %d SET %s \n",node, id, instance, index, valpar);
+                	        printf("COMMS = NODE %d CLASS %d INSTANCE %d INDEX %d SET \"%s\" (%d) \n",node, id, instance, index, valpar, size);
 
 			}
 		}
@@ -2786,7 +2793,7 @@ printf("Going ...\n");
     			if (tmp.length() > 0)
 			{
 			    int node	= 0;
-			    char valpar = 0;
+			    int valpar = 0;
 			    int instance= 0;
 			    int id	= 0;
 			    int index	= 0;
