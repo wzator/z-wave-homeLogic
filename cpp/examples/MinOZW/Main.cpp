@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20141116
+//	Main.cpp v0.20141123
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -124,7 +124,13 @@ struct config_type
 	int    tv_port;
 	int    dynamic[256];
 	int    washer_node;
+	
 };
+
+
+// WASHER variables
+float  washer_status;
+int    washer_offcounter;
 
 // Value-Defintions of the different String values
 
@@ -1603,6 +1609,106 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
                 fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
         }
 
+	// Washer
+	
+	if (config.washer_node > 0)
+	{
+	    // index = 8
+	    if (valueID.GetIndex() == 8 && id == 50 && nodeID == config.washer_node)
+	    {
+		float power = atof(dev_value);
+		if (power == 0) // ping or power off
+		{
+		    if (washer_status > 0)
+		    {
+			// send alarm
+			char info[4096];
+			time_t rawtime;
+			struct tm * timeinfo;
+	
+			time(&rawtime);
+			timeinfo = localtime(&rawtime);
+			sprintf(info,"- WASHER OFF - : Node %d Date %s ", nodeID, asctime(timeinfo));
+
+			if (strlen(config.gg_a1) > 0)
+		    	    RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+			if (strlen(config.gg_a2) > 0)
+			    RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		    }
+
+		    washer_status = 0;
+		    washer_offcounter = 0;
+		}
+
+		if (power > 0)
+		{
+
+		    if (power < 20 && washer_status == 3) // maybe off
+		    {
+			washer_offcounter++;
+			if (washer_offcounter > 10) // 10 actions under 20 so off?
+			{
+			    // send alarm
+			    char info[4096];
+			    time_t rawtime;
+			    struct tm * timeinfo;
+	
+			    time(&rawtime);
+			    timeinfo = localtime(&rawtime);
+			    sprintf(info,"- WASHER FINISH - : Node %d Date %s ", nodeID, asctime(timeinfo));
+
+			    if (strlen(config.gg_a1) > 0)
+		    	        RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+			    if (strlen(config.gg_a2) > 0)
+			        RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+			    washer_status = 0;
+			    washer_offcounter = 0;
+			}
+		    }
+		    else
+		    {
+			washer_offcounter=0;
+		    }
+
+		    if (power > 100 && washer_status == 2) // working
+		    {
+			washer_status = 3;
+		    }
+
+		    if (power > 20 && washer_status == 1) // yes, washer power on
+		    {
+			washer_status = 2;
+			washer_offcounter = 0;
+
+			// send alarm
+			char info[4096];
+			time_t rawtime;
+			struct tm * timeinfo;
+	
+			time(&rawtime);
+			timeinfo = localtime(&rawtime);
+			sprintf(info,"- WASHER ON - : Node %d Date %s ", nodeID, asctime(timeinfo));
+
+			if (strlen(config.gg_a1) > 0)
+		    	    RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+			if (strlen(config.gg_a2) > 0)
+			    RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+			
+		    }
+
+		    if (washer_status == 0)
+		    {
+			washer_status = 1; // maybe on
+		    }
+		}
+	    }
+	}
+
 	// Alarms
 
 	if (strlen(config.gg_a1) > 0 || strlen(config.gg_a1) > 0 || strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
@@ -2426,6 +2532,9 @@ int main(int argc, char* argv[]) {
 
     if (forked != 0)
 	return 0;
+
+	washer_status		= 0;
+	washer_offcounter	= 0;
 
 
 
