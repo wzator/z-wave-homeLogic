@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20141130
+//	Main.cpp v0.20141123
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -888,6 +888,13 @@ bool setValueByAll ( int32 home, int32 node, int32 myid, int32 instance, int32 m
 				{
 				    bool_value = (bool)value;
 				    response = Manager::Get()->SetValue( *it, bool_value );
+				}
+				else if ( ValueID::ValueType_Button == (*it).GetType() )
+				{
+				    if (value == 0)
+    			    		response = Manager::Get()->PressButton( *it ); 
+    			    	    else
+    			    		response = Manager::Get()->ReleaseButton( *it );
 				}
 				else if ( ValueID::ValueType_Byte == (*it).GetType() )
 				{
