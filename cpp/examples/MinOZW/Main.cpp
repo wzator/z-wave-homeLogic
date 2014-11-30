@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20141123
+//	Main.cpp v0.20141130
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -131,6 +131,7 @@ struct config_type
 // WASHER variables
 float  washer_status;
 int    washer_offcounter;
+struct tm washer_timestart;
 
 // Value-Defintions of the different String values
 
@@ -1626,7 +1627,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		float power = atof(dev_value);
 		if (power == 0) // ping or power off
 		{
-		    if (washer_status > 0)
+		    if (washer_status > 0 && washer_offcounter != -1)
 		    {
 			// send alarm
 			char info[4096];
@@ -1636,6 +1637,11 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
 			sprintf(info,"- WASHER OFF - : Node %d Date %s ", nodeID, asctime(timeinfo));
+
+			sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
+		        mysql_query(&mysql,query);
+			int valpar = 0;
+			setValueByAll( g_homeId, nodeID, 50, 1, 33, &valpar ); // reset
 
 			if (strlen(config.gg_a1) > 0)
 		    	    RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
@@ -1652,10 +1658,10 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		if (power > 0)
 		{
 
-		    if (power < 20 && washer_status == 3) // maybe off
+		    if (power < 15 && washer_status == 3) // maybe off
 		    {
 			washer_offcounter++;
-			if (washer_offcounter > 10) // 10 actions under 20 so off?
+			if (washer_offcounter > 10) // 10 actions under 15 so off?
 			{
 			    // send alarm
 			    char info[4096];
@@ -1671,6 +1677,26 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 			    if (strlen(config.gg_a2) > 0)
 			        RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		//  fork for sms because too slow
+		if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
+		{
+		    signal(SIGCHLD, SIG_IGN); // don't wait for children
+		    int forked = fork();
+
+    		    if (forked == 0)
+    		    {
+
+			if (strlen(config.sms_phone1) > 0)
+		    	    RPC_SendSMS(config.sms_phone1, info);
+
+			if (strlen(config.sms_phone2) > 0)
+			    RPC_SendSMS(config.sms_phone2, info);
+		
+			_exit(3);
+		    }
+		}
+
 
 			    washer_status = 0;
 			    washer_offcounter = 0;
@@ -1698,8 +1724,10 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
+			washer_timestart = *localtime(&rawtime);
 			sprintf(info,"- WASHER ON - : Node %d Date %s ", nodeID, asctime(timeinfo));
-
+			int valpar = 0;
+			setValueByAll( g_homeId, nodeID, 50, 1, 33, &valpar );
 			if (strlen(config.gg_a1) > 0)
 		    	    RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
 
@@ -2541,7 +2569,7 @@ int main(int argc, char* argv[]) {
 	return 0;
 
 	washer_status		= 0;
-	washer_offcounter	= 0;
+	washer_offcounter	= -1;
 
 
 
