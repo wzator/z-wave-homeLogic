@@ -1,11 +1,11 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20141130
+//	Main.cpp v0.20150324
 //
 //	Based on minimal application to test OpenZWave.
 //
 //
-//	Copyright (c) 2013-2014 Wojciech Zatorski <wojciech@zatorski.net>
+//	Copyright (c) 2013-2015 Wojciech Zatorski <wojciech@zatorski.net>
 //
 //
 //	OpenZWave SOFTWARE NOTICE AND LICENSE
@@ -124,6 +124,7 @@ struct config_type
 	int    tv_port;
 	int    dynamic[256];
 	int    washer_node;
+	int    dishwasher_node;
 	
 };
 
@@ -132,6 +133,10 @@ struct config_type
 float  washer_status;
 int    washer_offcounter;
 struct tm washer_timestart;
+
+float  dishwasher_status;
+int    dishwasher_offcounter;
+struct tm dishwasher_timestart;
 
 // Value-Defintions of the different String values
 
@@ -1495,11 +1500,11 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 
 void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notification const* _notification )
 {
-	int id = valueID.GetCommandClassId();
-	int genre = valueID.GetGenre();
-	string label = Manager::Get()->GetValueLabel( valueID );
-	int instanceID = valueID.GetInstance();
-	int type = valueID.GetType();
+	int id		= valueID.GetCommandClassId();
+	int genre	= valueID.GetGenre();
+	string label	= Manager::Get()->GetValueLabel( valueID );
+	int instanceID	= valueID.GetInstance();
+	int type	= valueID.GetType();
 	char dev_value[1024];
 	uint8 byte_value;
 	bool bool_value;
@@ -1617,17 +1622,17 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
                 fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
         }
 
-	// Washer
+	// Washer or dishwasher
 	
-	if (config.washer_node > 0)
+	if (config.washer_node > 0 || config.dishwasher_node > 0)
 	{
 	    // index = 8
-	    if (valueID.GetIndex() == 8 && id == 50 && nodeID == config.washer_node)
+	    if (valueID.GetIndex() == 8 && id == 50 && (nodeID == config.washer_node || nodeID == config.dishwasher_node))
 	    {
 		float power = atof(dev_value);
 		if (power == 0) // ping or power off
 		{
-		    if (washer_status > 0 && washer_offcounter != -1)
+		    if ((washer_status > 0 && washer_offcounter != -1) || (dishwasher_status > 0 && dishwasher_offcounter != -1))
 		    {
 			// send alarm
 			char info[4096];
@@ -1636,9 +1641,18 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
-			sprintf(info,"- WASHER OFF - : Node %d Date %s ", nodeID, asctime(timeinfo));
 
-			sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
+			if (nodeID == config.washer_node)
+			{
+				sprintf(info,"- WASHER OFF - : Node %d Date %s ", nodeID, asctime(timeinfo));
+				sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
+			}
+			else
+			{
+				sprintf(info,"- DISHWASHER OFF - : Node %d Date %s ", nodeID, asctime(timeinfo));
+				sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, dishwasher_timestart.tm_year+1900,dishwasher_timestart.tm_mon+1,dishwasher_timestart.tm_mday,dishwasher_timestart.tm_hour,dishwasher_timestart.tm_min,dishwasher_timestart.tm_sec,nodeID);
+			}
+
 		        mysql_query(&mysql,query);
 			int valpar = 0;
 			setValueByAll( g_homeId, nodeID, 50, 1, 33, &valpar ); // reset
@@ -1651,17 +1665,30 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 		    }
 
-		    washer_status = 0;
-		    washer_offcounter = 0;
+		    if (nodeID == config.washer_node)
+		    {
+			washer_status = 0;
+			washer_offcounter = 0;
+		    }
+		    else
+		    {
+			dishwasher_status = 0;
+			dishwasher_offcounter = 0;
+		    }
 		}
 
 		if (power > 0)
 		{
 
-		    if (power < 15 && washer_status == 3) // maybe off
+		    if ((power < 15 && washer_status == 3) || (dishwasher_status == 3 && power < 5)) // maybe off
 		    {
-			washer_offcounter++;
-			if (washer_offcounter > 10) // 10 actions under 15 so off?
+
+			if (nodeID == config.washer_node)
+			    washer_offcounter++;
+			else
+			    dishwasher_offcounter++;
+
+			if (washer_offcounter > 10 || dishwasher_offcounter > 10) // 10 actions under 15 so off?
 			{
 			    // send alarm
 			    char info[4096];
@@ -1670,7 +1697,11 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	
 			    time(&rawtime);
 			    timeinfo = localtime(&rawtime);
-			    sprintf(info,"- WASHER FINISH - : Node %d Date %s ", nodeID, asctime(timeinfo));
+
+			    if (nodeID == config.washer_node)
+				sprintf(info,"- WASHER FINISH - : Node %d Date %s ", nodeID, asctime(timeinfo));
+			    else
+				sprintf(info,"- DISHWASHER FINISH - : Node %d Date %s ", nodeID, asctime(timeinfo));
 
 			    if (strlen(config.gg_a1) > 0)
 		    	        RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
@@ -1678,44 +1709,73 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    if (strlen(config.gg_a2) > 0)
 			        RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
-		//  fork for sms because too slow
-		if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
-		{
-		    signal(SIGCHLD, SIG_IGN); // don't wait for children
-		    int forked = fork();
+			    //  fork for sms because too slow	
+			    if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
+			    {
+				signal(SIGCHLD, SIG_IGN); // don't wait for children
+				int forked = fork();
 
-    		    if (forked == 0)
-    		    {
+    				if (forked == 0)
+    				{
 
-			if (strlen(config.sms_phone1) > 0)
-		    	    RPC_SendSMS(config.sms_phone1, info);
+				    if (strlen(config.sms_phone1) > 0)
+		    			RPC_SendSMS(config.sms_phone1, info);
 
-			if (strlen(config.sms_phone2) > 0)
-			    RPC_SendSMS(config.sms_phone2, info);
+				    if (strlen(config.sms_phone2) > 0)
+					RPC_SendSMS(config.sms_phone2, info);
 		
-			_exit(3);
-		    }
-		}
+				    _exit(3);
+				}
+			    }
 
 
-			    washer_status = 0;
-			    washer_offcounter = 0;
+			    if (nodeID == config.washer_node)
+			    {
+			        washer_status = 0;
+				washer_offcounter = 0;
+			    }
+			    else
+			    {
+			        dishwasher_status = 0;
+				dishwasher_offcounter = 0;
+			    }
 			}
 		    }
 		    else
 		    {
-			washer_offcounter=0;
+			if (nodeID == config.washer_node)
+			    washer_offcounter=0;
+			else
+			    dishwasher_offcounter=0;
 		    }
 
-		    if (power > 100 && washer_status == 2) // working
+		    if (nodeID == config.washer_node)
 		    {
-			washer_status = 3;
+			if (power > 100 && washer_status == 2) // working
+			{
+			    washer_status = 3;
+			}
+		    }
+		    else
+		    {
+			if (power > 10 && dishwasher_status == 2) // working
+			{
+			    dishwasher_status = 3;
+			}
 		    }
 
-		    if (power > 20 && washer_status == 1) // yes, washer power on
+		    if (power > 20 && (washer_status == 1 || dishwasher_status == 1)) // yes, washer power on
 		    {
-			washer_status = 2;
-			washer_offcounter = 0;
+			if (nodeID == config.washer_node)
+			{
+			    washer_status = 2;
+			    washer_offcounter = 0;
+			}
+			else
+			{
+			    dishwasher_status = 2;
+			    dishwasher_offcounter = 0;
+			}
 
 			// send alarm
 			char info[4096];
@@ -1724,8 +1784,18 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
-			washer_timestart = *localtime(&rawtime);
-			sprintf(info,"- WASHER ON - : Node %d Date %s ", nodeID, asctime(timeinfo));
+
+			if (nodeID == config.washer_node)
+			{
+			    washer_timestart = *localtime(&rawtime);
+			    sprintf(info,"- WASHER ON - : Node %d Date %s ", nodeID, asctime(timeinfo));
+			}
+			else
+			{
+			    dishwasher_timestart = *localtime(&rawtime);
+			    sprintf(info,"- DISHWASHER ON - : Node %d Date %s ", nodeID, asctime(timeinfo));
+			}
+
 			int valpar = 0;
 			setValueByAll( g_homeId, nodeID, 50, 1, 33, &valpar );
 			if (strlen(config.gg_a1) > 0)
@@ -1739,6 +1809,11 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		    if (washer_status == 0)
 		    {
 			washer_status = 1; // maybe on
+		    }
+
+		    if (dishwasher_status == 0)
+		    {
+			dishwasher_status = 1; // maybe on
 		    }
 		}
 	    }
@@ -2178,6 +2253,12 @@ int get_configuration(struct config_type *config, char *path)
 			continue;
 		}
 
+		if ( (strcmp(token,"ZWAVE_DISHWASHER") == 0) && (strlen(val) != 0) )
+		{
+			config->dishwasher_node = atoi(val);
+			continue;
+		}
+
 		if ( (strcmp(token,"ZWAVE_DOOR_NODE") == 0) && (strlen(val) != 0) )
 		{
 			config->door_node = atoi(val);
@@ -2570,6 +2651,9 @@ int main(int argc, char* argv[]) {
 
 	washer_status		= 0;
 	washer_offcounter	= -1;
+	
+	dishwasher_status	= 0;
+	dishwasher_offcounter	= -1;
 
 
 
@@ -2993,12 +3077,12 @@ printf("Going ...\n");
     Manager::Get()->RemoveAssociation(g_homeId, 10, 1, 2);
     Manager::Get()->RemoveAssociation(g_homeId, 10, 1, 4);
     Manager::Get()->RemoveAssociation(g_homeId, 10, 1, 7);
-
-    Manager::Get()->AddAssociation(g_homeId, 3, 2, 10);
-    Manager::Get()->AddAssociation(g_homeId, 2, 2, 10);
-    Manager::Get()->AddAssociation(g_homeId, 4, 2, 10);
-    Manager::Get()->AddAssociation(g_homeId, 7, 2, 10);
 */
+    Manager::Get()->AddAssociation(g_homeId, 3, 2, 19);
+    Manager::Get()->AddAssociation(g_homeId, 2, 2, 19);
+    Manager::Get()->AddAssociation(g_homeId, 4, 2, 19);
+    Manager::Get()->AddAssociation(g_homeId, 7, 2, 19);
+
 /*
 			Manager::Get()->SetConfigParam(g_homeId, 13, 101, 225); // 11100001=1+32+64+128=225
 			Manager::Get()->SetConfigParam(g_homeId, 13, 2, 0); // wakeup after batt
