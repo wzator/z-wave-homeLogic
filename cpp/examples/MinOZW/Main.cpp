@@ -1632,7 +1632,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		float power = atof(dev_value);
 		if (power == 0) // ping or power off
 		{
-		    if ((washer_status > 0 && washer_offcounter != -1) || (dishwasher_status > 0 && dishwasher_offcounter != -1))
+		    if ((washer_status > 0 && washer_offcounter != -1 && nodeID == config.washer_node) || (dishwasher_status > 0 && dishwasher_offcounter != -1 && nodeID == config.dishwasher_node))
 		    {
 			// send alarm
 			char info[4096];
@@ -1680,7 +1680,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		if (power > 0)
 		{
 
-		    if ((power < 15 && washer_status == 3) || (dishwasher_status == 3 && power < 5)) // maybe off
+		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 5  && nodeID == config.dishwasher_node)) // maybe off
 		    {
 
 			if (nodeID == config.washer_node)
@@ -1688,7 +1688,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			else
 			    dishwasher_offcounter++;
 
-			if (washer_offcounter > 10 || dishwasher_offcounter > 10) // 10 actions under 15 so off?
+			if ((washer_offcounter > 10 && nodeID == config.washer_node) || (dishwasher_offcounter > 10 && nodeID == config.dishwasher_node)) // 10 actions under 15 so off?
 			{
 			    // send alarm
 			    char info[4096];
@@ -1764,7 +1764,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			}
 		    }
 
-		    if (power > 20 && (washer_status == 1 || dishwasher_status == 1)) // yes, washer power on
+		    if (power > 20 && (washer_status == 1 && nodeID == config.washer_node) || (dishwasher_status == 1 && nodeID == config.dishwasher_node)) // yes, washer power on
 		    {
 			if (nodeID == config.washer_node)
 			{
@@ -1806,12 +1806,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			
 		    }
 
-		    if (washer_status == 0)
+		    if (washer_status == 0 && nodeID == config.washer_node)
 		    {
 			washer_status = 1; // maybe on
 		    }
 
-		    if (dishwasher_status == 0)
+		    if (dishwasher_status == 0 && nodeID == config.dishwasher_node)
 		    {
 			dishwasher_status = 1; // maybe on
 		    }
