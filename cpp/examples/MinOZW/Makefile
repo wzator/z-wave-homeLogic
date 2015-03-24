@@ -10,10 +10,15 @@
 .PHONY:	default clean
 
 
-DEBUG_CFLAGS    := -Wall -Wno-format -ggdb -DDEBUG
+DEBUG_CFLAGS    := -Wall -Wno-format -g -DDEBUG
 RELEASE_CFLAGS  := -Wall -Wno-unknown-pragmas -Wno-format -O3
 
 DEBUG_LDFLAGS	:= -g
+
+# Change for DEBUG or RELEASE
+CFLAGS	:= -c $(DEBUG_CFLAGS)
+LDFLAGS	:= $(DEBUG_LDFLAGS)
+
 
 top_srcdir := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../../)
 
