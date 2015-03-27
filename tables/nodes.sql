@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS `nodes` (
   `created` datetime NOT NULL,
   `type` enum('POWER','BATTERY','','') DEFAULT NULL,
   `replaced` date DEFAULT NULL,
+  `ignoreNode` int(11) DEFAULT '0',
   `mtimestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY `id` (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;

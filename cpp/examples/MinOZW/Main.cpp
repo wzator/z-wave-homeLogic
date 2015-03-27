@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20150324
+//	Main.cpp v0.20150327
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -125,7 +125,7 @@ struct config_type
 	int    dynamic[256];
 	int    washer_node;
 	int    dishwasher_node;
-	
+	int    sms_commands;
 };
 
 
@@ -1200,10 +1200,24 @@ void zones_validate(int nodeId)
 	time(&rawtime);
 	timeinfo = localtime(&rawtime);
 
-	sprintf(info,"- MOVE AUTO - : Node %d Date %s", nodeId, asctime(timeinfo));
-	printf(info);
-	alarm(info);
-	return ;
+	sprintf(query,"SELECT ignoreNode FROM nodes WHERE id = %d LIMIT 1", nodeId);
+	mysql_query(&mysql,query);
+	result = mysql_store_result(&mysql);
+        row = mysql_fetch_row(result);
+	mysql_free_result(result);
+
+	if (atoi(row[0]) == 0)
+	{
+	    sprintf(info,"- MOVE AUTO - : Node %d Date %s", nodeId, asctime(timeinfo));
+	    printf(info);
+	    alarm(info);
+	    return ;
+	}
+	else
+	{
+	    sprintf(info,"- IGNORE AUTO - : Node %d Date %s", nodeId, asctime(timeinfo));
+	    printf(info);
+	}
     }
 
     sprintf(query,"SELECT COUNT(*) AS cdx FROM zonesFree WHERE zonesFree.date = DATE(NOW())");
@@ -1680,7 +1694,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		if (power > 0)
 		{
 
-		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 5  && nodeID == config.dishwasher_node)) // maybe off
+		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 1  && nodeID == config.dishwasher_node)) // maybe off
 		    {
 
 			if (nodeID == config.washer_node)
@@ -2346,6 +2360,12 @@ int get_configuration(struct config_type *config, char *path)
 		if ((strcmp(token,"LOG_LEVEL")==0) && (strlen(val)!=0))
 		{
 			config->log_level = atoi(val);
+			continue;
+		}
+
+		if ( (strcmp(token,"SMS_COMMANDS") == 0) && (strlen(val) != 0) )
+		{
+			config->sms_commands = atoi(val);
 			continue;
 		}
 
