@@ -353,6 +353,110 @@ void toDOT(char txt[])
 }
 
 
+int RPC_LoadSMS()
+{
+// GSM
+	gboolean start;
+	GSM_MultiSMSMessage 	sms;
+	GSM_SMSMessage 	smsD;
+	GSM_StateMachine *s;
+	GSM_Config *cfg;
+	GSM_Error error;
+        GSM_SMSFolders folders;
+	int i;
+
+	MYSQL_RES *result;
+	MYSQL_ROW row;
+
+	/* Register signal handler */
+	signal(SIGINT, interrupt);
+	signal(SIGTERM, interrupt);
+
+	/*
+	 * We don't need gettext, but need to set locales so that
+	 * charset conversion works.
+	 */
+	GSM_InitLocales(NULL);
+
+	/* Allocates state machine */
+	s = GSM_AllocStateMachine();
+	if (s == NULL)
+		return 3;
+
+	cfg = GSM_GetConfig(s, 0);
+
+	free(cfg->Device);
+	cfg->Device = strdup(config.sms_device);
+
+	free(cfg->Connection);
+	cfg->Connection = strdup(config.sms_connection);
+
+	/* We have one valid configuration */
+	GSM_SetConfigNum(s, 1);
+
+	/* Connect to phone */
+	/* 1 means number of replies you want to wait for */
+	error = GSM_InitConnection(s, 3);
+	error_handler(error,s);
+
+	error = GSM_GetSMSFolders(s, &folders);
+	error_handler(error,s);
+	memset(&sms, 0, sizeof(sms));
+	memset(&smsD, 0, sizeof(smsD));
+
+	/* Read all messages */
+	error = ERR_NONE;
+	start = TRUE;
+
+	for (int a=0; a<10; a++)
+	{
+	    sms.Number = 0;
+	    sms.SMS[0].Location = a;
+	    sms.SMS[0].Folder = 0;
+
+	    error=GSM_GetSMS(s, &sms);
+
+	    if (sms.Number != 0)
+	    {
+		printf("Number: %d\n",sms.Number);
+	        printf("Location: %d, Folder: %d\n", sms.SMS[0].Location, sms.SMS[0].Folder);
+	        printf("Number: \"%s\"\n", DecodeUnicodeConsole(sms.SMS[0].Number));
+
+		char text[256];
+		if (sms.SMS[i].Coding == SMS_Coding_8bit) {
+			printf("8-bit message, can not display\n");
+		} else {
+			sprintf(text,"%s", DecodeUnicodeConsole(sms.SMS[0].Text));
+			printf("Text: \"%s\"\n", DecodeUnicodeConsole(sms.SMS[0].Text));
+		}
+
+		if (strcmp(text,"FREEDAY")==0)
+		{
+		    pthread_mutex_lock(&g_criticalSection);
+		    char query[256];
+		    sprintf(query,"INSERT INTO zonesFree (date) VALUES (NOW())");
+		    mysql_query(&mysql,query);
+
+		    pthread_mutex_unlock(&g_criticalSection);
+		}
+
+		smsD.Location = a;
+		smsD.Folder = 0;
+		GSM_DeleteSMS(s, &smsD);
+	    }
+	}
+
+
+	/* Terminate connection */
+	error = GSM_TerminateConnection(s);
+	error_handler(error,s);
+
+	/* Free up used memory */
+	GSM_FreeStateMachine(s);
+
+	return 0;
+
+}
 
 int RPC_SendSMS(char *recipient_number, char *message_text)
 {
@@ -377,10 +481,6 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 	 */
 	GSM_InitLocales(NULL);
 
-	/* Enable global debugging to stderr */
-	debug_info = GSM_GetGlobalDebug();
-	GSM_SetDebugFileDescriptor(stderr, TRUE, debug_info);
-	GSM_SetDebugLevel("textall", debug_info);
 
 	/* Prepare message */
 	/* Cleanup the structure */
@@ -426,7 +526,7 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 
 	/* Connect to phone */
 	/* 1 means number of replies you want to wait for */
-	error = GSM_InitConnection(s, 1);
+	error = GSM_InitConnection(s, 3);
 	error_handler(error,s);
 
 	/* Set callback for message sending */
@@ -1694,7 +1794,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		if (power > 0)
 		{
 
-		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 1  && nodeID == config.dishwasher_node)) // maybe off
+		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 2  && nodeID == config.dishwasher_node)) // maybe off
 		    {
 
 			if (nodeID == config.washer_node)
@@ -1778,7 +1878,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			}
 		    }
 
-		    if (power > 20 && (washer_status == 1 && nodeID == config.washer_node) || (dishwasher_status == 1 && nodeID == config.dishwasher_node)) // yes, washer power on
+		    if (power > 20 && ((washer_status == 1 && nodeID == config.washer_node) || (dishwasher_status == 1 && nodeID == config.dishwasher_node))) // yes, washer power on
 		    {
 			if (nodeID == config.washer_node)
 			{
@@ -2625,6 +2725,7 @@ timerHandler(sigval_t t )
 
         pthread_mutex_unlock(&g_criticalSection);
 
+	RPC_LoadSMS();
 
 }
 
