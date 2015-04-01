@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20150327
+//	Main.cpp v0.20150330
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -68,9 +68,11 @@
 #include <libssh/libssh.h>
 #include "base64.h"
 #include <ifaddrs.h>
-
+#include <locale.h>
+#include <libintl.h>
 
 #define PACKETSIZE  64
+#define _(String) gettext (String)
 
 using namespace OpenZWave;
 
@@ -249,7 +251,7 @@ int ping(char *adress)
 
     if (proto == NULL)
     {
-	perror("getprotobyname errror");
+	perror(_("getprotobyname errror"));
 	return 1;
     }
 
@@ -261,13 +263,13 @@ int ping(char *adress)
     }
     if ( setsockopt(sd, SOL_IP, IP_TTL, &val, sizeof(val)) != 0)
     {
-        perror("Set TTL option");
+        perror(_("Set TTL option"));
         close(sd);
         return 1;
     }
     if ( fcntl(sd, F_SETFL, O_NONBLOCK) != 0 )
     {
-        perror("Request nonblocking I/O");
+        perror(_("Request nonblocking I/O"));
         close(sd);
         return 1;
     }
@@ -292,7 +294,7 @@ int ping(char *adress)
         pckt.hdr.un.echo.sequence = cnt++;
         pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
         if ( sendto(sd, &pckt, sizeof(pckt), 0, (struct sockaddr*)addr, sizeof(*addr)) <= 0 )
-            perror("sendto");
+            perror(_("sendto"));
 
         usleep(300000);
 
@@ -313,22 +315,22 @@ int ping(char *adress)
 
 void send_sms_callback (GSM_StateMachine *sm, int status, int MessageReference, void * user_data)
 {
-	printf("Sent SMS on device: \"%s\"\n", GSM_GetConfig(sm, -1)->Device);
+	printf(_("Sent SMS on device: \"%s\"\n"), GSM_GetConfig(sm, -1)->Device);
 	if (status==0) {
-		printf("..OK");
+		printf(_("..OK"));
 		sms_send_status = ERR_NONE;
 	} else {
-		printf("..error %i", status);
+		printf(_("..error %i"), status);
 		sms_send_status = ERR_UNKNOWN;
 	}
-	printf(", message reference=%d\n", MessageReference);
+	printf(_(", message reference=%d\n"), MessageReference);
 }
 
 /* Function to handle errors */
 void error_handler(GSM_Error error, GSM_StateMachine *s)
 {
 	if (error != ERR_NONE) {
-		printf("ERROR: %s\n", GSM_ErrorString(error));
+		printf(_("ERROR: %s\n"), GSM_ErrorString(error));
 		if (GSM_IsConnected(s))
 			GSM_TerminateConnection(s);
 		exit(error);
@@ -418,26 +420,51 @@ int RPC_LoadSMS()
 
 	    if (sms.Number != 0)
 	    {
-		printf("Number: %d\n",sms.Number);
-	        printf("Location: %d, Folder: %d\n", sms.SMS[0].Location, sms.SMS[0].Folder);
-	        printf("Number: \"%s\"\n", DecodeUnicodeConsole(sms.SMS[0].Number));
+		printf(_("Number: %d\n"),sms.Number);
+	        printf(_("Location: %d, Folder: %d\n"), sms.SMS[0].Location, sms.SMS[0].Folder);
+	        printf(_("Number: \"%s\"\n"), DecodeUnicodeConsole(sms.SMS[0].Number));
 
 		char text[256];
-		if (sms.SMS[i].Coding == SMS_Coding_8bit) {
-			printf("8-bit message, can not display\n");
+		if (sms.SMS[0].Coding == SMS_Coding_8bit) {
+			printf(_("8-bit message, can not display\n"));
 		} else {
 			sprintf(text,"%s", DecodeUnicodeConsole(sms.SMS[0].Text));
-			printf("Text: \"%s\"\n", DecodeUnicodeConsole(sms.SMS[0].Text));
+			printf(_("Text: \"%s\"\n"), DecodeUnicodeConsole(sms.SMS[0].Text));
 		}
 
-		if (strcmp(text,"FREEDAY")==0)
-		{
-		    pthread_mutex_lock(&g_criticalSection);
-		    char query[256];
-		    sprintf(query,"INSERT INTO zonesFree (date) VALUES (NOW())");
-		    mysql_query(&mysql,query);
 
-		    pthread_mutex_unlock(&g_criticalSection);
+		if ((strlen(config.sms_phone1) > 0&& strstr(text,config.sms_phone1)!= NULL) || (strstr(text,config.sms_phone2)!= NULL && strlen(config.sms_phone2) > 0))
+		{
+		    if (strcmp(text,"FREEDAY")==0)
+		    {
+			pthread_mutex_lock(&g_criticalSection);
+		        char query[256];
+		        sprintf(query,"INSERT INTO zonesFree (date) VALUES (NOW())");
+			mysql_query(&mysql,query);
+
+		        pthread_mutex_unlock(&g_criticalSection);
+		    }
+
+		    if (strcmp(text,"ALWAYSON")==0)
+		    {
+			pthread_mutex_lock(&g_criticalSection);
+		        char query[256];
+		        sprintf(query,"UPDATE parameters SET parValue = 1 WHERE parName='sensorAlwaysOn'");
+			mysql_query(&mysql,query);
+
+		        pthread_mutex_unlock(&g_criticalSection);
+		    }
+
+		    if (strcmp(text,"ALWAYSOFF")==0)
+		    {
+			pthread_mutex_lock(&g_criticalSection);
+		        char query[256];
+		        sprintf(query,"UPDATE parameters SET parValue = 0 WHERE parName='sensorAlwaysOn'");
+			mysql_query(&mysql,query);
+
+		        pthread_mutex_unlock(&g_criticalSection);
+		    }
+
 		}
 
 		smsD.Location = a;
@@ -617,17 +644,17 @@ int tvRemote(std::string skey, std::string myip, std::string remoteip)
 
     if (sockfd < 0)
     {
-        perror("ERROR opening socket");
+        perror(_("ERROR opening socket"));
         return -1;
     }
 
     if (server == NULL) {
-        fprintf(stderr,"ERROR, no such host\n");
+        fprintf(stderr,_("ERROR, no such host\n"));
         return -1;
     }
 
     if (getifaddrs(&ifaddr) == -1) {
-	perror("getifaddrs");
+	perror(_("getifaddrs"));
 	return -1;
     }
 
@@ -643,7 +670,7 @@ int tvRemote(std::string skey, std::string myip, std::string remoteip)
 		sizeof(struct sockaddr_in6),
 	        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 	    if (s == 0 && strcmp(ifa->ifa_name,"eth0")==0) {
-		    printf("add: %s = %s\n",host,ifa->ifa_name);
+		    printf(_("add: %s = %s\n"),host,ifa->ifa_name);
 		    break;
 	    }
 	}
@@ -689,7 +716,7 @@ int tvRemote(std::string skey, std::string myip, std::string remoteip)
 
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0)
     {
-        perror("ERROR connecting");
+        perror(_("ERROR connecting"));
         return -1;
     }
 
@@ -708,13 +735,13 @@ int tvRemote(std::string skey, std::string myip, std::string remoteip)
 
     if (n < 0) 
     {
-         perror("ERROR writing to socket");
+         perror(_("ERROR writing to socket"));
     }
 
     bzero(buffer,256);
     n = read(sockfd,buffer,255);
     if (n < 0) 
-         perror("ERROR reading from socket");
+         perror(_("ERROR reading from socket"));
 
     close(sockfd);
     return 0;
@@ -794,39 +821,36 @@ int verify_knownhost(ssh_session session)
     case SSH_SERVER_KNOWN_OK:
 	break; /* ok */
     case SSH_SERVER_KNOWN_CHANGED:
-        fprintf(stderr, "Host key for server changed: it is now:\n");
-        ssh_print_hexa("Public key hash", hash, hlen);
-        fprintf(stderr, "For security reasons, connection will be stopped\n");
+        fprintf(stderr, _("Host key for server changed: it is now:\n"));
+        ssh_print_hexa(_("Public key hash"), hash, hlen);
+        fprintf(stderr, _("For security reasons, connection will be stopped\n"));
 	free(hash);
 	return -1;
     case SSH_SERVER_FOUND_OTHER:
-	fprintf(stderr, "The host key for this server was not found but an other"
-	"type of key exists.\n");
-	fprintf(stderr, "An attacker might change the default server key to"
-	"confuse your client into thinking the key does not exist\n");
+	fprintf(stderr, _("The host key for this server was not found but an other type of key exists.\n"));
+	fprintf(stderr, _("An attacker might change the default server key to confuse your client into thinking the key does not exist\n"));
 	free(hash);
 	return -1;
     case SSH_SERVER_FILE_NOT_FOUND:
-	fprintf(stderr, "Could not find known host file.\n");
-	fprintf(stderr, "If you accept the host key here, the file will be"
-	"automatically created.\n");
+	fprintf(stderr, _("Could not find known host file.\n"));
+	fprintf(stderr, _("If you accept the host key here, the file will be automatically created.\n"));
 	/* fallback to SSH_SERVER_NOT_KNOWN behavior */
     case SSH_SERVER_NOT_KNOWN:
 	hexa = ssh_get_hexa(hash, hlen);
-	fprintf(stderr,"The server is unknown. Do you trust the host key?\n");
-	fprintf(stderr, "Public key hash: %s\n", hexa);
+	fprintf(stderr,_("The server is unknown. Do you trust the host key?\n"));
+	fprintf(stderr, _("Public key hash: %s\n"), hexa);
 	free(hexa);
 
     if (ssh_write_knownhost(session) < 0)
     {
-	fprintf(stderr, "Error %s\n", strerror(errno));
+	fprintf(stderr, _("Error %s\n"), strerror(errno));
         free(hash);
 	return -1;
     }
 
     break;
     case SSH_SERVER_ERROR:
-	fprintf(stderr, "Error %s", ssh_get_error(session));
+	fprintf(stderr, _("Error %s"), ssh_get_error(session));
 	    free(hash);
 	    return -1;
 	}
@@ -852,7 +876,7 @@ int RPC_SSHdo(const char *command, const char *cfg_host, const char *cfg_login, 
 
     if (rc != SSH_OK)
     {
-        fprintf(stderr, "Error connecting to localhost: %s\n",
+        fprintf(stderr, _("Error connecting to localhost: %s\n"),
         ssh_get_error(my_ssh_session));
 	ssh_free(my_ssh_session);
         return (-1);
@@ -871,7 +895,7 @@ int RPC_SSHdo(const char *command, const char *cfg_host, const char *cfg_login, 
     rc = ssh_userauth_password(my_ssh_session, cfg_login, cfg_password);
     if (rc != SSH_AUTH_SUCCESS)
     {
-        fprintf(stderr, "Error authenticating with password: %s\n",
+        fprintf(stderr, _("Error authenticating with password: %s\n"),
         ssh_get_error(my_ssh_session));
         ssh_disconnect(my_ssh_session);
         ssh_free(my_ssh_session);
@@ -904,19 +928,19 @@ int RPC_SendGG(int number, unsigned char *text)
 	p.password = config.gg_passwd;
 	
 	if (!(sess = gg_login(&p))) {
-		printf("Nie udało się połączyć: %s\n", strerror(errno));
+		printf(_("Can not connect: %s\n"), strerror(errno));
 		gg_free_session(sess);
 		return 1;
 	}
 
 	if (gg_notify(sess, NULL, 0) == -1) {	/* serwery gg nie pozwalaja wysylac wiadomosci bez powiadomienia o userliscie (przetestowane p.protocol_version [0x15; def] */
-		printf("Połączenie przerwane: %s\n", strerror(errno));
+		printf(_("Connection aborted: %s\n"), strerror(errno));
 		gg_free_session(sess);
 		return 1;
 	}
 
 	if (gg_send_message(sess, GG_CLASS_MSG, number, (unsigned char*) text) == -1) {
-		printf("Połączenie przerwane: %s\n", strerror(errno));
+		printf(_("Connection aborted: %s\n"), strerror(errno));
 		gg_free_session(sess);
 		return 1;
 	}
@@ -925,14 +949,14 @@ int RPC_SendGG(int number, unsigned char *text)
 
 	while (0) {
 		if (!(e = gg_watch_fd(sess))) {
-			printf("Połączenie przerwane: %s\n", strerror(errno));
+			printf(_("Connection broken: %s\n"), strerror(errno));
 			gg_logoff(sess);
 			gg_free_session(sess);
 			return 1;
 		}
 
 		if (e->type == GG_EVENT_ACK) {
-			printf("Wysłano.\n");
+			printf(_("Send.\n"));
 			gg_free_event(e);
 			break;
 		}
@@ -963,7 +987,7 @@ bool setPoint (int32 home, int32 node, string int_value)
 			{
 				response = Manager::Get()->SetValue( *it, int_value );
 
-			    printf("Command class: %d\n",id);
+			    printf(_("Command class: %d\n"),id);
 			}
 		}
 	}
@@ -1308,14 +1332,14 @@ void zones_validate(int nodeId)
 
 	if (atoi(row[0]) == 0)
 	{
-	    sprintf(info,"- MOVE AUTO - : Node %d Date %s", nodeId, asctime(timeinfo));
+	    sprintf(info,_("- MOVE AUTO - : Node %d Date %s"), nodeId, asctime(timeinfo));
 	    printf(info);
 	    alarm(info);
 	    return ;
 	}
 	else
 	{
-	    sprintf(info,"- IGNORE AUTO - : Node %d Date %s", nodeId, asctime(timeinfo));
+	    sprintf(info,_("- IGNORE AUTO - : Node %d Date %s"), nodeId, asctime(timeinfo));
 	    printf(info);
 	}
     }
@@ -1342,14 +1366,14 @@ void zones_validate(int nodeId)
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
     
-		sprintf(info,"- MOVE - : Node %d Date %s", nodeId, asctime(timeinfo));
+		sprintf(info,_("- MOVE - : Node %d Date %s"), nodeId, asctime(timeinfo));
 		printf(info);
 		alarm(info);
 	
     }
     else
     {
-	printf("No move [%d]\n", row[0]);
+	printf(_("No move [%d]\n"), row[0]);
     }
 
     mysql_free_result(result);
@@ -1370,7 +1394,7 @@ void zones_validate(int nodeId)
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
     
-		sprintf(info,"- ONE MOVE - : Node %d Date %s", nodeId, asctime(timeinfo));
+		sprintf(info,_("- ONE MOVE - : Node %d Date %s"), nodeId, asctime(timeinfo));
 		printf(info);
 		alarm(info);
 
@@ -1400,7 +1424,7 @@ void RPC_WakeUp( int homeID, int nodeID, Notification const* _notification )
 
         if(mysql_query(&mysql, query))
         {
-                fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+                fprintf(stderr, _("Could not insert row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
         }
 
 }
@@ -1480,7 +1504,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 		instanceID = 1;
 	}
 
-	printf("BASIC_CLASS: HomeId=%d Node=%d\n", homeID, nodeID );
+	printf(_("BASIC_CLASS: HomeId=%d Node=%d\n"), homeID, nodeID );
 
 	snprintf( dev_value, 1024, "%d", value );
 
@@ -1506,7 +1530,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 */
         if(mysql_query(&mysql, query))
         {
-                fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+                fprintf(stderr, _("Could not insert row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
         }
 
 /* lights management */
@@ -1524,7 +1548,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 
         if(mysql_query(&mysql, query))
         {
-                fprintf(stderr, "Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+                fprintf(stderr, _("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
 	}
 	else
 	{
@@ -1555,7 +1579,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 		    sprintf(query,"(SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),basic.timestamp)) / 60) AS nodeTime, valueINT, basic.timestamp  FROM basic WHERE node = %d ORDER BY basic.timestamp DESC LIMIT 1) UNION (SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),switches.timestamp)) / 60) AS nodeTime, status, switches.timestamp  FROM switches WHERE node = %d ORDER BY switches.timestamp DESC LIMIT 1)", myNodes[a][2],myNodes[a][2]);
     		    if(mysql_query(&mysql, query))
     		    {
-    		        fprintf(stderr, "Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+    		        fprintf(stderr, _("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
 		    }
 		    else
 		    {
@@ -1573,7 +1597,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 	    			    if (atoi(rowL[0]) < lastTime)
 	    	    		    {
 	    	    			skip++;
-	    	    		        printf("Skip Node %d from %d (time %s/%s last time %d : %s)\n",myNodes[a][0],myNodes[a][2],rowL[0],rowL[1],lastTime,rowL[2]);
+	    	    		        printf(_("Skip Node %d from %d (time %s/%s last time %d : %s)\n"),myNodes[a][0],myNodes[a][2],rowL[0],rowL[1],lastTime,rowL[2]);
 	    	    		    }
 	    	    		}
 	    	    	}
@@ -1600,7 +1624,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 	if (value == 255)
 	{
 	    zones_validate(nodeID);
-	    printf("Zones validate for node %d",nodeID);
+	    printf(_("Zones validate for node %d"),nodeID);
 	}
 
 }
@@ -1758,12 +1782,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 			if (nodeID == config.washer_node)
 			{
-				sprintf(info,"- WASHER OFF - : Node %d Date %s ", nodeID, asctime(timeinfo));
+				sprintf(info,_("- WASHER OFF - : Node %d Date %s "), nodeID, asctime(timeinfo));
 				sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
 			}
 			else
 			{
-				sprintf(info,"- DISHWASHER OFF - : Node %d Date %s ", nodeID, asctime(timeinfo));
+				sprintf(info,_("- DISHWASHER OFF - : Node %d Date %s "), nodeID, asctime(timeinfo));
 				sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, dishwasher_timestart.tm_year+1900,dishwasher_timestart.tm_mon+1,dishwasher_timestart.tm_mday,dishwasher_timestart.tm_hour,dishwasher_timestart.tm_min,dishwasher_timestart.tm_sec,nodeID);
 			}
 
@@ -1794,7 +1818,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		if (power > 0)
 		{
 
-		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 2  && nodeID == config.dishwasher_node)) // maybe off
+		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 3  && nodeID == config.dishwasher_node)) // maybe off
 		    {
 
 			if (nodeID == config.washer_node)
@@ -1802,7 +1826,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			else
 			    dishwasher_offcounter++;
 
-			if ((washer_offcounter > 10 && nodeID == config.washer_node) || (dishwasher_offcounter > 10 && nodeID == config.dishwasher_node)) // 10 actions under 15 so off?
+			if ((washer_offcounter > 10 && nodeID == config.washer_node) || (dishwasher_offcounter > 20 && nodeID == config.dishwasher_node)) // 10 actions under 15 so off?
 			{
 			    // send alarm
 			    char info[4096];
@@ -1813,9 +1837,9 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    timeinfo = localtime(&rawtime);
 
 			    if (nodeID == config.washer_node)
-				sprintf(info,"- WASHER FINISH - : Node %d Date %s ", nodeID, asctime(timeinfo));
+				sprintf(info,_("- WASHER FINISH - : Node %d Date %s "), nodeID, asctime(timeinfo));
 			    else
-				sprintf(info,"- DISHWASHER FINISH - : Node %d Date %s ", nodeID, asctime(timeinfo));
+				sprintf(info,_("- DISHWASHER FINISH - : Node %d Date %s"), nodeID, asctime(timeinfo));
 
 			    if (strlen(config.gg_a1) > 0)
 		    	        RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
@@ -1902,12 +1926,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			if (nodeID == config.washer_node)
 			{
 			    washer_timestart = *localtime(&rawtime);
-			    sprintf(info,"- WASHER ON - : Node %d Date %s ", nodeID, asctime(timeinfo));
+			    sprintf(info,_("- WASHER ON - : Node %d Date %s"), nodeID, asctime(timeinfo));
 			}
 			else
 			{
 			    dishwasher_timestart = *localtime(&rawtime);
-			    sprintf(info,"- DISHWASHER ON - : Node %d Date %s ", nodeID, asctime(timeinfo));
+			    sprintf(info,_("- DISHWASHER ON - : Node %d Date %s"), nodeID, asctime(timeinfo));
 			}
 
 			int valpar = 0;
@@ -1954,7 +1978,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
-		sprintf(info,"- ALARM - : Node %d Date %s ", nodeID, asctime(timeinfo));
+		sprintf(info,_("- ALARM - : Node %d Date %s"), nodeID, asctime(timeinfo));
 
 		if (strlen(config.gg_a1) > 0)
 			RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
@@ -1972,11 +1996,11 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		    MYSQL_ROW row;
 		    row = mysql_fetch_row(result);
 		    mysql_free_result(result);
-		    printf("alarm node available\n");
+		    printf(_("alarm node available\n"));
 			// ALARM OPTION DISABLED?
 		        if (atoi(row[0]) == 0)
 		        {
-		    	    printf("alarm enabled\n");
+			    printf(_("alarm enabled\n"));
 			    sprintf(query,"SELECT id FROM zonesAlarms WHERE node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) ) ",nodeID);
 			    mysql_query(&mysql,query);
 			    result = mysql_store_result(&mysql);
@@ -1985,7 +2009,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    printf("%s\n",query);
 			    while ((row = mysql_fetch_row(result)))
 			    {
-				printf("alarm zone : %s\n",row[0]);
+				printf(_("alarm zone : %s\n"),row[0]);
 				sprintf(query,"UPDATE zonesAlarms SET zonesAlarms.timestamp = NOW(), zonesAlarms.alarms=zonesAlarms.alarms+1 WHERE id = %s LIMIT 1", row[0]);
 			        mysql_query(&mysql,query);
 			        alarms++;
@@ -1995,7 +2019,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    if (alarms > 0)
 			    {
 	    			bool res = setValue(g_homeId,config.alarm_node,1);
-        	    	        printf("ALARM ON = NODE %d : %d\n",config.alarm_node, res);
+        	    	        printf(_("ALARM ON = NODE %d : %d\n"),config.alarm_node, res);
         	    	        alarmstatus = 1;
         	    	    }
         	        }
@@ -2523,32 +2547,32 @@ void OnControllerUpdate( Driver::ControllerState cs, Driver::ControllerError err
 	switch (cs) {
 		case Driver::ControllerState_Normal:
 		{
-			printf("ControllerState Event: no command in progress" );
+			printf(_("ControllerState Event: no command in progress") );
 			break;
 		}
 		case Driver::ControllerState_Waiting:
 		{
-			printf("ControllerState Event: waiting for a user action" );
+			printf(_("ControllerState Event: waiting for a user action") );
 			break;
 		}
 		case Driver::ControllerState_InProgress:
 		{
-			printf("ControllerState Event: communicating with the other device" );
+			printf(_("ControllerState Event: communicating with the other device") );
 			break;
 		}
 		case Driver::ControllerState_Completed:
 		{
-			printf("ControllerState Event: command has completed successfully" );
+			printf(_("ControllerState Event: command has completed successfully") );
 			break;
 		}
 		case Driver::ControllerState_Failed:
 		{
-			printf("ControllerState Event: command has failed" );
+			printf(_("ControllerState Event: command has failed") );
 			break;
 		}
 		case Driver::ControllerState_NodeOK:
 		{
-			printf("ControllerState Event: the node is OK");
+			printf(_("ControllerState Event: the node is OK"));
 
 			// Store Node State
 
@@ -2556,7 +2580,7 @@ void OnControllerUpdate( Driver::ControllerState cs, Driver::ControllerError err
 		}
 		case Driver::ControllerState_NodeFailed:
 		{
-			printf("ControllerState Event: the node has failed" );
+			printf(_("ControllerState Event: the node has failed") );
 
 			// Store Node State
 
@@ -2564,7 +2588,7 @@ void OnControllerUpdate( Driver::ControllerState cs, Driver::ControllerError err
 		}
 		default:
 		{
-			printf("ControllerState Event:  unknown response" );
+			printf(_("ControllerState Event:  unknown response") );
 			break;
 		}
 	}
@@ -2589,7 +2613,7 @@ timerHandler(sigval_t t )
 
         if(mysql_query(&mysql, query))
         {
-                printf("Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+                printf(_("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
 	}
 	else
 	{
@@ -2605,7 +2629,7 @@ timerHandler(sigval_t t )
 	    }
 	    else
 	    {
-		printf("TIMER: [ZONESPOWER] Nothing to do\n");
+		printf(_("TIMER: [ZONESPOWER] Nothing to do\n"));
 	    }
 
 	    mysql_free_result(result);
@@ -2617,7 +2641,7 @@ timerHandler(sigval_t t )
 
         if(mysql_query(&mysql, query))
         {
-                printf("Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+                printf(_("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
 	}
 	else
 	{
@@ -2670,7 +2694,7 @@ timerHandler(sigval_t t )
 
         if(mysql_query(&mysql, query))
         {
-                printf("Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+                printf(_("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
 	}
 	else
 	{
@@ -2688,7 +2712,7 @@ timerHandler(sigval_t t )
 	    }
 	    else
 	    {
-		printf("TIMER: [TV] Nothing to do\n");
+		printf(_("TIMER: [TV] Nothing to do\n"));
 	    }
 
 	    mysql_free_result(result);
@@ -2700,7 +2724,7 @@ timerHandler(sigval_t t )
 
         if(mysql_query(&mysql, query))
         {
-                printf("Could not select row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+                printf(_("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
 	}
 	else
 	{
@@ -2718,14 +2742,18 @@ timerHandler(sigval_t t )
 	    }
 	    else
 	    {
-		printf("TIMER: [STATE] Nothing to do\n");
+		printf(_("TIMER: [STATE] Nothing to do\n"));
 	    }
 
 	}
 
         pthread_mutex_unlock(&g_criticalSection);
 
-	RPC_LoadSMS();
+	// /etc/zwave.conf enable/disable
+	if (config.sms_commands == 1)
+	{
+	    RPC_LoadSMS();
+	}
 
 }
 
@@ -2777,12 +2805,15 @@ int main(int argc, char* argv[]) {
 	dishwasher_offcounter	= -1;
 
 
+    setlocale(LC_ALL,"MinOZW");
+    bindtextdomain("","/usr/share/locale");
+    textdomain("MinOZW");
 
     get_configuration(&config, argv[1]);
 
     if(!mysql_init(&mysql))
     {
-        fprintf(stderr, "Cannot initialize MySQL");
+        fprintf(stderr, _("Cannot initialize MySQL"));
         exit(0);
     }
 
