@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS `zonesLights`;
 CREATE TABLE IF NOT EXISTS `zonesLights` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `homeid` int(11) DEFAULT NULL,
   `sensorNode` int(11) NOT NULL,
   `lightNode` int(11) NOT NULL,
   `timeStart` time NOT NULL,

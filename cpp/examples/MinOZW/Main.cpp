@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20150330
+//	Main.cpp v0.20150401
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -112,6 +112,7 @@ struct config_type
 	char   sms_device[64];
 	char   sms_connection[64];
 	char   zwave_device[64];
+	long int zwave_id;
 	int    alarm_node;
 	int    light_node;
 	int    power_node[255];
@@ -1302,7 +1303,7 @@ void alarm(char *info)
 // 
 //-----------------------------------------------------------------------------
 
-void zones_validate(int nodeId)
+void zones_validate(int nodeId, long int homeId)
 {
     char query[4096];
     char info[1024];
@@ -1351,7 +1352,7 @@ void zones_validate(int nodeId)
     int skipZones = atoi(row[0]);
     mysql_free_result(result);
 
-    sprintf(query,"SELECT COUNT(*) AS cdx FROM zones WHERE node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND active = 1", nodeId);
+    sprintf(query,"SELECT COUNT(*) AS cdx FROM zones WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND active = 1", homeId, nodeId);
     mysql_query(&mysql,query);
     result = mysql_store_result(&mysql);
     num_fields = mysql_num_fields(result);
@@ -1378,7 +1379,7 @@ void zones_validate(int nodeId)
 
     mysql_free_result(result);
 
-    sprintf(query,"SELECT id FROM zonesAction WHERE node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND DATE(zonesAction.timestamp) != DATE(NOW())",nodeId);
+    sprintf(query,"SELECT id FROM zonesAction WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND DATE(zonesAction.timestamp) != DATE(NOW())",homeId,nodeId);
     mysql_query(&mysql,query);
     result = mysql_store_result(&mysql);
     num_fields = mysql_num_fields(result);
@@ -1537,12 +1538,12 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 
 	if (atoi(dev_value) > 0) /* sensorNode ON */
 	{
-	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE sensorNode = %d AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND active = 1 ", nodeID);
+	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE homeid = %d AND sensorNode = %d AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND active = 1 ", homeID, nodeID);
 	    sprintf(startedQry,"1");
 	}
 	else
 	{
-	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE ((sensorNode = %d AND endNode IS NULL) OR (endNode = %d AND startedQry IS NOT NULL)) AND active = 1 AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd", nodeID, nodeID);
+	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE ((sensorNode = %d AND endNode IS NULL) OR (endNode = %d AND startedQry IS NOT NULL)) AND active = 1 AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND homeid = %d", nodeID, nodeID, homeID);
 	    sprintf(startedQry,"NULL");
 	}
 
@@ -1576,7 +1577,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 		if (myNodes[a][2] > 1)
 		{
 		    int lastTime = myNodes[a][3];
-		    sprintf(query,"(SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),basic.timestamp)) / 60) AS nodeTime, valueINT, basic.timestamp  FROM basic WHERE node = %d ORDER BY basic.timestamp DESC LIMIT 1) UNION (SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),switches.timestamp)) / 60) AS nodeTime, status, switches.timestamp  FROM switches WHERE node = %d ORDER BY switches.timestamp DESC LIMIT 1)", myNodes[a][2],myNodes[a][2]);
+		    sprintf(query,"(SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),basic.timestamp)) / 60) AS nodeTime, valueINT, basic.timestamp  FROM basic WHERE node = %d AND homeid = %d ORDER BY basic.timestamp DESC LIMIT 1) UNION (SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),switches.timestamp)) / 60) AS nodeTime, status, switches.timestamp  FROM switches WHERE node = %d AND homeid = %d ORDER BY switches.timestamp DESC LIMIT 1)", myNodes[a][2],homeID,myNodes[a][2],homeID);
     		    if(mysql_query(&mysql, query))
     		    {
     		        fprintf(stderr, _("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
@@ -1623,7 +1624,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 	/* for alarms when 255 is returned */
 	if (value == 255)
 	{
-	    zones_validate(nodeID);
+	    zones_validate(nodeID,homeID);
 	    printf(_("Zones validate for node %d"),nodeID);
 	}
 
@@ -1765,7 +1766,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	if (config.washer_node > 0 || config.dishwasher_node > 0)
 	{
 	    // index = 8
-	    if (valueID.GetIndex() == 8 && id == 50 && (nodeID == config.washer_node || nodeID == config.dishwasher_node))
+	    if (homeID == config.zwave_id && valueID.GetIndex() == 8 && id == 50 && (nodeID == config.washer_node || nodeID == config.dishwasher_node))
 	    {
 		float power = atof(dev_value);
 		if (power == 0) // ping or power off
@@ -1783,12 +1784,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			if (nodeID == config.washer_node)
 			{
 				sprintf(info,_("- WASHER OFF - : Node %d Date %s "), nodeID, asctime(timeinfo));
-				sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
+				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%d,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
 			}
 			else
 			{
 				sprintf(info,_("- DISHWASHER OFF - : Node %d Date %s "), nodeID, asctime(timeinfo));
-				sprintf(query,"INSERT INTO nodesActionHistory (nodeId,timeStart,timeEnd,`value`) VALUES (%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", nodeID, dishwasher_timestart.tm_year+1900,dishwasher_timestart.tm_mon+1,dishwasher_timestart.tm_mday,dishwasher_timestart.tm_hour,dishwasher_timestart.tm_min,dishwasher_timestart.tm_sec,nodeID);
+				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%d,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, dishwasher_timestart.tm_year+1900,dishwasher_timestart.tm_mon+1,dishwasher_timestart.tm_mday,dishwasher_timestart.tm_hour,dishwasher_timestart.tm_min,dishwasher_timestart.tm_sec,nodeID);
 			}
 
 		        mysql_query(&mysql,query);
@@ -2001,7 +2002,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		        if (atoi(row[0]) == 0)
 		        {
 			    printf(_("alarm enabled\n"));
-			    sprintf(query,"SELECT id FROM zonesAlarms WHERE node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) ) ",nodeID);
+			    sprintf(query,"SELECT id FROM zonesAlarms WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) ) ",homeID,nodeID);
 			    mysql_query(&mysql,query);
 			    result = mysql_store_result(&mysql);
 			    num_fields = mysql_num_fields(result);
@@ -2523,6 +2524,12 @@ int get_configuration(struct config_type *config, char *path)
 			continue;
 		}
 
+		if ( (strcmp(token,"ZWAVE_ID") == 0) && (strlen(val) != 0) )
+		{
+			config->zwave_id = atoi(val);
+			continue;
+		}
+
 
 	}
 
@@ -2609,7 +2616,7 @@ timerHandler(sigval_t t )
 
     pthread_mutex_lock(&g_criticalSection);
 
-    sprintf(query,"SELECT zonesPower.powernode,zonesPower.value FROM zonesPower LEFT JOIN switches ON (switches.node = zonesPower.powernode) WHERE TIME(NOW()) > actiontimestart AND TIME(NOW()) < actiontimeend AND zonesPower.result <> switches.status AND zonesPower.active = 1");
+    sprintf(query,"SELECT zonesPower.powernode,zonesPower.value FROM zonesPower LEFT JOIN switches ON (switches.node = zonesPower.powernode AND switches.homeid = zonesPower.homeid) WHERE TIME(NOW()) > actiontimestart AND TIME(NOW()) < actiontimeend AND zonesPower.result <> switches.status AND zonesPower.active = 1");
 
         if(mysql_query(&mysql, query))
         {
@@ -2637,7 +2644,7 @@ timerHandler(sigval_t t )
 
 ////////////////////////////////////
 
-    sprintf(query,"SELECT zonesThermo.thermonode,zonesThermo.value FROM zonesThermo LEFT JOIN thermostat ON (thermostat.node = zonesThermo.thermonode) WHERE TIME(NOW()) > actiontimestart AND TIME(NOW()) < actiontimeend AND zonesThermo.value <> thermostat.temp AND zonesThermo.active = 1");
+    sprintf(query,"SELECT zonesThermo.thermonode,zonesThermo.value FROM zonesThermo LEFT JOIN thermostat ON (thermostat.node = zonesThermo.thermonode AND thermostat.homeid = zonesThermo.homeid) WHERE TIME(NOW()) > actiontimestart AND TIME(NOW()) < actiontimeend AND zonesThermo.value <> thermostat.temp AND zonesThermo.active = 1");
 
         if(mysql_query(&mysql, query))
         {
@@ -2720,7 +2727,7 @@ timerHandler(sigval_t t )
 
  /////////////////////////////////////
 
-    sprintf(query,"SELECT node FROM `stateGet` where NOW() > DATE_ADD(lastupdate, INTERVAL updateEveryMinutes MINUTE)");
+    sprintf(query,"SELECT node FROM `stateGet` where homeid = %d NOW() > DATE_ADD(lastupdate, INTERVAL updateEveryMinutes MINUTE)",config.zwave_id);
 
         if(mysql_query(&mysql, query))
         {

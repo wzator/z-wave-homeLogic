@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS `nodesActionHistory`;
 
 CREATE TABLE IF NOT EXISTS `nodesActionHistory` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `homeid` int(11) DEFAULT NULL,
   `nodeId` int(11) NOT NULL,
   `timeStart` datetime NOT NULL,
   `timeEnd` datetime NOT NULL,

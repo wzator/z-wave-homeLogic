@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS `nodes`;
 CREATE TABLE IF NOT EXISTS `nodes` (
+  `homeid` int(11) DEFAULT NULL,
   `id` int(11) NOT NULL,
   `name` varchar(1024) CHARACTER SET utf8 COLLATE utf8_polish_ci NOT NULL,
   `created` datetime NOT NULL,

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS `zones` (
   `endMinutes` int(11) NOT NULL,
   `active` int(11) NOT NULL,
   `node` int(11) DEFAULT NULL,
+  `homeid` int(11) DEFAULT NULL,
   `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `timestamp` (`timestamp`)

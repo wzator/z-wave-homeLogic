@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS `zonesThermo`;
 CREATE TABLE IF NOT EXISTS `zonesThermo` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `homeid` int(11) DEFAULT NULL,
   `thermonode` int(11) NOT NULL,
   `actiontimestart` time NOT NULL,
   `actiontimeend` time DEFAULT NULL,

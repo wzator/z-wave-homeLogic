@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS `zonesPower`;
 CREATE TABLE IF NOT EXISTS `zonesPower` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `homeid` int(11) DEFAULT NULL,
   `powernode` int(11) NOT NULL,
   `actiontimestart` time NOT NULL,
   `actiontimeend` time DEFAULT NULL,
