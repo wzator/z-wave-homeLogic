@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20150401
+//	Main.cpp v0.20150403
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -356,16 +356,57 @@ void toDOT(char txt[])
 }
 
 
+int SMSsendNow(GSM_StateMachine *s, GSM_SMSMessage *smsO, char *message_text)
+{
+	int return_value = 0;
+	GSM_Error error;
+
+    for (int i=0; i<2; i++) 
+    {
+
+	if (i==0 && strlen(config.sms_phone1))
+	    EncodeUnicode(smsO->Number, config.sms_phone1, strlen(config.sms_phone1));
+
+	if (i==1 && strlen(config.sms_phone2))
+	    EncodeUnicode(smsO->Number, config.sms_phone2, strlen(config.sms_phone2));
+
+	EncodeUnicode(smsO->Text, message_text, strlen(message_text));
+
+        sms_send_status = ERR_TIMEOUT;
+	error = GSM_SendSMS(s, smsO);
+        error_handler(error,s);
+
+	while (!gshutdown) {
+    	    GSM_ReadDevice(s, TRUE);
+	    if (sms_send_status == ERR_NONE) {
+		/* Message sent OK */
+		return_value = 0;
+		break;
+	    }
+
+	    if (sms_send_status != ERR_TIMEOUT) {
+		    	/* Message sending failed */
+		    return_value = 100;
+		    break;
+	    }
+	}
+    }
+    return return_value;
+
+}
+
 int RPC_LoadSMS()
 {
 // GSM
 	gboolean start;
 	GSM_MultiSMSMessage 	sms;
 	GSM_SMSMessage 	smsD;
+	GSM_SMSMessage smsO;
 	GSM_StateMachine *s;
 	GSM_Config *cfg;
 	GSM_Error error;
         GSM_SMSFolders folders;
+	GSM_SMSC PhoneSMSC;
 	int i;
 
 	MYSQL_RES *result;
@@ -402,14 +443,31 @@ int RPC_LoadSMS()
 	error = GSM_InitConnection(s, 3);
 	error_handler(error,s);
 
+	GSM_SetSendSMSStatusCallback(s, send_sms_callback, NULL);
+
 	error = GSM_GetSMSFolders(s, &folders);
 	error_handler(error,s);
 	memset(&sms, 0, sizeof(sms));
 	memset(&smsD, 0, sizeof(smsD));
 
+	/* We need to know SMSC number */
+	PhoneSMSC.Location = 1;
+	error = GSM_GetSMSC(s, &PhoneSMSC);
+	error_handler(error,s);
 	/* Read all messages */
 	error = ERR_NONE;
 	start = TRUE;
+
+	memset(&smsO, 0, sizeof(smsO));
+	smsO.PDU = SMS_Submit;
+	smsO.UDH.Type = UDH_NoUDH;
+	smsO.Coding = SMS_Coding_Default_No_Compression;
+	smsO.Class = 1;
+
+	/* Set SMSC number in message */
+	CopyUnicodeString(smsO.SMSC.Number, PhoneSMSC.Number);
+
+
 
 	for (int a=0; a<10; a++)
 	{
@@ -426,6 +484,9 @@ int RPC_LoadSMS()
 	        printf(_("Number: \"%s\"\n"), DecodeUnicodeConsole(sms.SMS[0].Number));
 
 		char text[256];
+		char mynumber[256];
+		sprintf(mynumber, "%s", DecodeUnicodeConsole(sms.SMS[0].Number));
+
 		if (sms.SMS[0].Coding == SMS_Coding_8bit) {
 			printf(_("8-bit message, can not display\n"));
 		} else {
@@ -434,7 +495,7 @@ int RPC_LoadSMS()
 		}
 
 
-		if ((strlen(config.sms_phone1) > 0&& strstr(text,config.sms_phone1)!= NULL) || (strstr(text,config.sms_phone2)!= NULL && strlen(config.sms_phone2) > 0))
+		if ((strlen(config.sms_phone1) > 0 && strstr(mynumber,config.sms_phone1)!= NULL) || (strstr(mynumber,config.sms_phone2)!= NULL && strlen(config.sms_phone2) > 0))
 		{
 		    if (strcmp(text,"FREEDAY")==0)
 		    {
@@ -443,7 +504,17 @@ int RPC_LoadSMS()
 		        sprintf(query,"INSERT INTO zonesFree (date) VALUES (NOW())");
 			mysql_query(&mysql,query);
 
+			int lastid = mysql_insert_id(&mysql);
+
 		        pthread_mutex_unlock(&g_criticalSection);
+
+			if (lastid > 0) 
+			{
+			    char message_text[256];
+			    sprintf(message_text,_("FREEDAY active"));
+			    SMSsendNow(s, &smsO, message_text);
+			}
+
 		    }
 
 		    if (strcmp(text,"ALWAYSON")==0)
@@ -496,7 +567,6 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 
 	GSM_SMSMessage sms;
 	GSM_SMSC PhoneSMSC;
-	GSM_Debug_Info *debug_info;
 	int return_value = 0;
 
 	/* Register signal handler */
@@ -530,15 +600,6 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 	s = GSM_AllocStateMachine();
 	if (s == NULL)
 		return 3;
-
-	/*
-	 * Enable state machine debugging to stderr
-	 * Same could be achieved by just using global debug config.
-	 */
-	debug_info = GSM_GetDebug(s);
-	GSM_SetDebugGlobal(FALSE, debug_info);
-	GSM_SetDebugFileDescriptor(stderr, TRUE, debug_info);
-	GSM_SetDebugLevel("textall", debug_info);
 
 	// Get pointer to config structure
 	cfg = GSM_GetConfig(s, 0);
@@ -2727,7 +2788,7 @@ timerHandler(sigval_t t )
 
  /////////////////////////////////////
 
-    sprintf(query,"SELECT node FROM `stateGet` where homeid = %d NOW() > DATE_ADD(lastupdate, INTERVAL updateEveryMinutes MINUTE)",config.zwave_id);
+    sprintf(query,"SELECT node FROM `stateGet` where homeid = %d AND NOW() > DATE_ADD(lastupdate, INTERVAL updateEveryMinutes MINUTE)",config.zwave_id);
 
         if(mysql_query(&mysql, query))
         {
