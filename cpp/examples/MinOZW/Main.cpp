@@ -133,12 +133,12 @@ struct config_type
 
 
 // WASHER variables
-float  washer_status;
-int    washer_offcounter;
+float  washer_status		= 0;
+int    washer_offcounter	= 0;
 struct tm washer_timestart;
 
-float  dishwasher_status;
-int    dishwasher_offcounter;
+float  dishwasher_status	= 0;
+int    dishwasher_offcounter	= 0;
 struct tm dishwasher_timestart;
 
 // Value-Defintions of the different String values
@@ -328,6 +328,19 @@ void send_sms_callback (GSM_StateMachine *sm, int status, int MessageReference, 
 }
 
 /* Function to handle errors */
+int error_handler_back(GSM_Error error, GSM_StateMachine *s)
+{
+	if (error != ERR_NONE) {
+		printf(_("ERROR: %s\n"), GSM_ErrorString(error));
+		if (GSM_IsConnected(s))
+			GSM_TerminateConnection(s);
+		return false;
+	}
+
+    return true;
+}
+
+/* Function to handle errors */
 void error_handler(GSM_Error error, GSM_StateMachine *s)
 {
 	if (error != ERR_NONE) {
@@ -441,19 +454,24 @@ int RPC_LoadSMS()
 	/* Connect to phone */
 	/* 1 means number of replies you want to wait for */
 	error = GSM_InitConnection(s, 3);
-	error_handler(error,s);
+	if (error_handler_back(error,s) == false)
+	    return 0;
 
 	GSM_SetSendSMSStatusCallback(s, send_sms_callback, NULL);
 
 	error = GSM_GetSMSFolders(s, &folders);
-	error_handler(error,s);
+	if (error_handler_back(error,s) == false)
+	    return 0;;
+
 	memset(&sms, 0, sizeof(sms));
 	memset(&smsD, 0, sizeof(smsD));
 
 	/* We need to know SMSC number */
 	PhoneSMSC.Location = 1;
 	error = GSM_GetSMSC(s, &PhoneSMSC);
-	error_handler(error,s);
+	if (error_handler_back(error,s) == false)
+	    return 0;
+
 	/* Read all messages */
 	error = ERR_NONE;
 	start = TRUE;
@@ -548,7 +566,9 @@ int RPC_LoadSMS()
 
 	/* Terminate connection */
 	error = GSM_TerminateConnection(s);
-	error_handler(error,s);
+
+	if (error_handler_back(error,s) == false)
+	    return 0;
 
 	/* Free up used memory */
 	GSM_FreeStateMachine(s);
@@ -1386,7 +1406,7 @@ void zones_validate(int nodeId, long int homeId)
 	time(&rawtime);
 	timeinfo = localtime(&rawtime);
 
-	sprintf(query,"SELECT ignoreNode FROM nodes WHERE id = %d LIMIT 1", nodeId);
+	sprintf(query,"SELECT ignoreNode FROM nodes WHERE id = %d AND homeid = %d LIMIT 1", nodeId, homeId);
 	mysql_query(&mysql,query);
 	result = mysql_store_result(&mysql);
         row = mysql_fetch_row(result);
@@ -1394,14 +1414,14 @@ void zones_validate(int nodeId, long int homeId)
 
 	if (atoi(row[0]) == 0)
 	{
-	    sprintf(info,_("- MOVE AUTO - : Node %d Date %s"), nodeId, asctime(timeinfo));
+	    sprintf(info,_("- MOVE AUTO - : Node %d Home %d Date %s"), nodeId, homeId, asctime(timeinfo));
 	    printf(info);
 	    alarm(info);
 	    return ;
 	}
 	else
 	{
-	    sprintf(info,_("- IGNORE AUTO - : Node %d Date %s"), nodeId, asctime(timeinfo));
+	    sprintf(info,_("- IGNORE AUTO - : Node %d Home %d Date %s"), nodeId, homeId, asctime(timeinfo));
 	    printf(info);
 	}
     }
@@ -1834,6 +1854,18 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		{
 		    if ((washer_status > 0 && washer_offcounter != -1 && nodeID == config.washer_node) || (dishwasher_status > 0 && dishwasher_offcounter != -1 && nodeID == config.dishwasher_node))
 		    {
+
+			if (nodeID == config.washer_node)
+		        {
+			    washer_status = 0;
+			    washer_offcounter = 0;
+			}
+			else
+			{
+			    dishwasher_status = 0;
+			    dishwasher_offcounter = 0;
+			}
+			
 			// send alarm
 			char info[4096];
 			time_t rawtime;
@@ -1865,22 +1897,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 		    }
 
-		    if (nodeID == config.washer_node)
-		    {
-			washer_status = 0;
-			washer_offcounter = 0;
-		    }
-		    else
-		    {
-			dishwasher_status = 0;
-			dishwasher_offcounter = 0;
-		    }
 		}
 
 		if (power > 0)
 		{
 
-		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 3  && nodeID == config.dishwasher_node)) // maybe off
+		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 1  && nodeID == config.dishwasher_node)) // maybe off
 		    {
 
 			if (nodeID == config.washer_node)
@@ -1932,12 +1954,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    if (nodeID == config.washer_node)
 			    {
 			        washer_status = 0;
-				washer_offcounter = 0;
+				washer_offcounter = -1;
 			    }
 			    else
 			    {
 			        dishwasher_status = 0;
-				dishwasher_offcounter = 0;
+				dishwasher_offcounter = -1;
 			    }
 			}
 		    }
