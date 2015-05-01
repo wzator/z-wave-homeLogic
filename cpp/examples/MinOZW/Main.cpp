@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20150403
+//	Main.cpp v0.20150501
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -124,6 +124,7 @@ struct config_type
 	char   tv_pass[50];
 	char   tv_start[256];
 	char   tv_off[256];
+	char   prefix[256];
 	int    tv_port;
 	int    dynamic[256];
 	int    washer_node;
@@ -529,7 +530,7 @@ int RPC_LoadSMS()
 			if (lastid > 0) 
 			{
 			    char message_text[256];
-			    sprintf(message_text,_("FREEDAY active"));
+			    sprintf(message_text,"[%s] %s",config.prefix, _("FREEDAY active"));
 			    SMSsendNow(s, &smsO, message_text);
 			}
 
@@ -543,6 +544,11 @@ int RPC_LoadSMS()
 			mysql_query(&mysql,query);
 
 		        pthread_mutex_unlock(&g_criticalSection);
+
+			char message_text[256];
+			sprintf(message_text,"[%s] %s",config.prefix,_("ENABLED: Sensors always on"));
+			SMSsendNow(s, &smsO, message_text);
+
 		    }
 
 		    if (strcmp(text,"ALWAYSOFF")==0)
@@ -553,6 +559,12 @@ int RPC_LoadSMS()
 			mysql_query(&mysql,query);
 
 		        pthread_mutex_unlock(&g_criticalSection);
+
+			char message_text[256];
+			sprintf(message_text,"[%s] %s",config.prefix,_("DISABLED: Sensors always on"));
+			SMSsendNow(s, &smsO, message_text);
+
+
 		    }
 
 		}
@@ -1303,12 +1315,13 @@ int tvManager(char *option, char *mkeys)
 
 		if (strlen(keys)>2)
 	        {
-    		    sleep(15); /* CEC sloooow */
+    		    sleep(1500); /* CEC sloooow */
 	    	    char *p = strtok(keys,";");
 		    while (p != NULL)
 		    {
 			std::string skey = p;
 
+    			sleep(500); /* CEC sloooow */
 			tvRemote(skey, "192.168.0.1", config.tv_ip);
 		        p = strtok(NULL, ";");
 		    }
@@ -1414,7 +1427,7 @@ void zones_validate(int nodeId, long int homeId)
 
 	if (atoi(row[0]) == 0)
 	{
-	    sprintf(info,_("- MOVE AUTO - : Node %d Home %d Date %s"), nodeId, homeId, asctime(timeinfo));
+	    sprintf(info,_("[%s] - MOVE AUTO - : Node %d Home %d Date %s"), config.prefix, nodeId, homeId, asctime(timeinfo));
 	    printf(info);
 	    alarm(info);
 	    return ;
@@ -1448,7 +1461,7 @@ void zones_validate(int nodeId, long int homeId)
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
     
-		sprintf(info,_("- MOVE - : Node %d Date %s"), nodeId, asctime(timeinfo));
+		sprintf(info,_("[%s] - MOVE - : Node %d Date %s"), config.prefix, nodeId, asctime(timeinfo));
 		printf(info);
 		alarm(info);
 	
@@ -1476,7 +1489,7 @@ void zones_validate(int nodeId, long int homeId)
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
     
-		sprintf(info,_("- ONE MOVE - : Node %d Date %s"), nodeId, asctime(timeinfo));
+		sprintf(info,_("[%s] - ONE MOVE - : Node %d Date %s"), config.prefix, nodeId, asctime(timeinfo));
 		printf(info);
 		alarm(info);
 
@@ -1586,14 +1599,14 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 		instanceID = 1;
 	}
 
-	printf(_("BASIC_CLASS: HomeId=%d Node=%d\n"), homeID, nodeID );
+	printf(_("BASIC_CLASS: HomeId=%d Node=%d Value=%d\n"), homeID, nodeID, value );
 
 	snprintf( dev_value, 1024, "%d", value );
 
         sprintf(query, "INSERT INTO basic (homeid,node,instance,valueINT,parentId) VALUES (");
 
 	if (value == 0)
-	    sprintf(query, "%s%d,%d,%d,\'%s\',(SELECT MAX(id) FROM basic AS b WHERE node = %d AND valueINT > 0)",query,homeID,nodeID,instanceID,dev_value,nodeID);
+	    sprintf(query, "%s%d,%d,%d,\'%s\',(SELECT MAX(id) FROM basic AS b WHERE node = %d AND valueINT > 0 AND homeid = %d)",query,homeID,nodeID,instanceID,dev_value,nodeID, homeID);
 	else
 	    sprintf(query, "%s%d,%d,%d,\'%s\',NULL",query,homeID,nodeID,instanceID,dev_value);
 
@@ -1617,7 +1630,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 
 /* lights management */
 
-	if (atoi(dev_value) > 0) /* sensorNode ON */
+	if ( value > 0) /* sensorNode ON */
 	{
 	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE homeid = %d AND sensorNode = %d AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND active = 1 ", homeID, nodeID);
 	    sprintf(startedQry,"1");
@@ -1641,12 +1654,24 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 	    {
 		if (row[0])
 		    myNodes[i][0]=strtol(row[0],&garbage,0);
+		else
+		    myNodes[i][0]=0;
+
 		if (row[1])
 		    myNodes[i][1]=strtol(row[1],&garbage,0);
+		else
+		    myNodes[i][1]=0;
+
 		if (row[2])
 		    myNodes[i][2]=strtol(row[2],&garbage,0);
+		else
+		    myNodes[i][2]=0;
+
 		if (row[3])
 		    myNodes[i][3]=strtol(row[3],&garbage,0);
+		else
+		    myNodes[i][3]=0;
+
 		i++;
 	    }
 
@@ -1745,7 +1770,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	printf("Label=%s\n", label.c_str() );
 	printf("Units=%s\n", Manager::Get()->GetValueUnits( valueID ).c_str() );
 
-        sprintf(query, "INSERT INTO notifications (homeid,node,genre,commandclass,instance,`index`,label,units,type,valueINT,valueSTRING) VALUES (");
+        sprintf(query, "INSERT INTO notifications (homeid,node,genre,commandclass,instance,`index`,label,units,type,valueINT,valueSTRING,`year`) VALUES (");
 
 	sprintf(query, "%s%d,%d",query,homeID,nodeID);
 	sprintf(query, "%s,%d,%d",query,genre,id);
@@ -1835,7 +1860,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		return;
 	}
 
-	sprintf(query, "%s)",query);
+	sprintf(query, "%s,YEAR(NOW()))",query);
 
         if(mysql_query(&mysql, query))
         {
@@ -2062,7 +2087,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
-		sprintf(info,_("- ALARM - : Node %d Date %s"), nodeID, asctime(timeinfo));
+		sprintf(info,_("[%s] - ALARM - : Node %d Date %s"), config.prefix, nodeID, asctime(timeinfo));
 
 		if (strlen(config.gg_a1) > 0)
 			RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
@@ -2484,6 +2509,13 @@ int get_configuration(struct config_type *config, char *path)
 		if ( (strcmp(token,"ZWAVE_DOOR_NODE") == 0) && (strlen(val) != 0) )
 		{
 			config->door_node = atoi(val);
+			continue;
+		}
+
+
+		if ( (strcmp(token,"PREFIX") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->prefix, val);
 			continue;
 		}
 
