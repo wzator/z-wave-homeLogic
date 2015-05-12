@@ -411,8 +411,7 @@ int SMSsendNow(GSM_StateMachine *s, GSM_SMSMessage *smsO, char *message_text)
 
 int RPC_LoadSMS()
 {
-// GSM
-	gboolean start;
+	// GSM
 	GSM_MultiSMSMessage 	sms;
 	GSM_SMSMessage 	smsD;
 	GSM_SMSMessage smsO;
@@ -421,10 +420,6 @@ int RPC_LoadSMS()
 	GSM_Error error;
         GSM_SMSFolders folders;
 	GSM_SMSC PhoneSMSC;
-	int i;
-
-	MYSQL_RES *result;
-	MYSQL_ROW row;
 
 	/* Register signal handler */
 	signal(SIGINT, interrupt);
@@ -475,7 +470,6 @@ int RPC_LoadSMS()
 
 	/* Read all messages */
 	error = ERR_NONE;
-	start = TRUE;
 
 	memset(&smsO, 0, sizeof(smsO));
 	smsO.PDU = SMS_Submit;
@@ -1404,7 +1398,6 @@ void zones_validate(int nodeId, long int homeId)
     char info[1024];
 
     MYSQL_RES *result;
-    int num_fields;
     MYSQL_ROW row;
 
     sprintf(query,"SELECT parValue FROM parameters WHERE parName = 'sensorAlwaysOn' LIMIT 1");
@@ -1450,7 +1443,6 @@ void zones_validate(int nodeId, long int homeId)
     sprintf(query,"SELECT COUNT(*) AS cdx FROM zones WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND active = 1", homeId, nodeId);
     mysql_query(&mysql,query);
     result = mysql_store_result(&mysql);
-    num_fields = mysql_num_fields(result);
 
     row = mysql_fetch_row(result);
 
@@ -1477,7 +1469,6 @@ void zones_validate(int nodeId, long int homeId)
     sprintf(query,"SELECT id FROM zonesAction WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND DATE(zonesAction.timestamp) != DATE(NOW())",homeId,nodeId);
     mysql_query(&mysql,query);
     result = mysql_store_result(&mysql);
-    num_fields = mysql_num_fields(result);
 
     while ((row = mysql_fetch_row(result)))
     {
@@ -2102,7 +2093,6 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		    sprintf(query,"SELECT parValue FROM parameters WHERE parName = 'alarmDisabled' LIMIT 1");
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
-		    int num_fields = mysql_num_fields(result);
 		    MYSQL_ROW row;
 		    row = mysql_fetch_row(result);
 		    mysql_free_result(result);
@@ -2114,7 +2104,6 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    sprintf(query,"SELECT id FROM zonesAlarms WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) ) ",homeID,nodeID);
 			    mysql_query(&mysql,query);
 			    result = mysql_store_result(&mysql);
-			    num_fields = mysql_num_fields(result);
 			    int alarms = 0 ;
 			    printf("%s\n",query);
 			    while ((row = mysql_fetch_row(result)))
