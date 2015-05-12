@@ -1754,6 +1754,8 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	NodeInfo* nodeInfo;
 	char query[4096];
 
+        setlocale(LC_NUMERIC, "C");
+
 	printf("%s: HomeId=%d Node=%d\n", (add)?"ValueAdded":"ValueChanged", homeID, nodeID );
 	printf("Genre=%d\n", genre );
 	printf("CommandClassId=%d\n", id );
