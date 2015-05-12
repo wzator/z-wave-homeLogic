@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20150501
+//	Main.cpp v0.20150506
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -2060,6 +2060,46 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    }
 	}
 
+	// Actions ZoneStart
+
+	    char *to = new char[(strlen(dev_value) * 2) + 1];
+	    mysql_real_escape_string(&mysql, to, dev_value, strlen(dev_value));
+	    MYSQL_ROW row;
+
+	    sprintf(query,"SELECT id, endNode, endValue, delayTimeMin, stampOnly, commandclassEnd, instanceEnd, indexEnd FROM zonesStart WHERE homeid = %d AND startNode = %d AND startValue = \"%s\" AND actiontimestart > NOW() AND NOW() < actiontimeend AND active = 1 AND commandclassStart = %d AND instanceStart = %d AND indexStart = %d", homeID, nodeID, to, id, instanceID, valueID.GetIndex());
+	    int res = mysql_query(&mysql,query);
+	    if (res == 0) {
+		MYSQL_RES *result = mysql_store_result(&mysql);
+		printf("%s\n",query);
+		int num_rows = mysql_num_rows(result);
+		if (num_rows > 0 && res == 0)
+		{
+		    while ((row = mysql_fetch_row(result)))
+	    	    {
+			printf(_("Action zoneStart : %s\n"),row[0]);
+			int stampOnly		= atoi(row[4]);
+			int delayTimeMin		= atoi(row[3]);
+			int idTable			= atoi(row[0]);
+			int endNode			= atoi(row[1]);
+			int endValue		= atoi(row[2]);
+			int commandClassEnd		= atoi(row[4]);
+			int instanceEnd		= atoi(row[5]);
+			int indexEnd		= atoi(row[6]);
+
+			if (stampOnly == 0)
+			{
+			    bool res = setValueByAll(g_homeId, endNode, commandClassEnd, instanceEnd, indexEnd, &endValue);
+    	    	    	    printf("ZONESTART = NODE %d : %d => %d\n", endNode, res, endValue);
+			}
+
+			sprintf(query,"UPDATE zonesStart SET lastAction = NOW() WHERE id = %d", idTable);
+			mysql_query(&mysql,query);
+		    }
+    
+	        }
+		mysql_free_result(result);
+	    }
+
 	// Alarms
 
 	if (strlen(config.gg_a1) > 0 || strlen(config.gg_a1) > 0 || strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
@@ -2859,7 +2899,55 @@ timerHandler(sigval_t t )
 		printf(_("TIMER: [STATE] Nothing to do\n"));
 	    }
 
+	    mysql_free_result(result);
 	}
+
+ /////////////////////////////////////////
+
+	    sprintf(query,"SELECT zS.id, zS.endNode, zS.endValue, zS.delayTimeMin, zS.stampOnly, zS.commandclassEnd, zS.instanceEnd, zS.indexEnd, zS.parentRule, COUNT(z1.id) AS zSum1, COUNT(z2.id) AS zSum2 FROM zonesStart AS zS LEFT JOIN zonesStart AS z1 ON (z1.ruleId = zS.parentRule) LEFT JOIN zonesStart AS z2 ON (z2.ruleId = zS.parentRule AND z2.lastAction IS NOT NULL) WHERE zS.homeid = %d AND zS.actiontimestart > NOW() AND NOW() < zS.actiontimeend AND zS.active = 1 AND zS.delayTimeMin IS NOT NULL AND zS.stampOnly = 1 AND zS.lastAction IS NOT NULL AND NOW() > (zS.lastAction +  INTERVAL zS.delayTimeMin MINUTE) GROUP BY zS.id", g_homeId);
+	    int res = mysql_query(&mysql,query);
+	    if (res == 0) 
+	    {
+
+		MYSQL_RES *result = mysql_store_result(&mysql);
+
+		int num_rows = mysql_num_rows(result);
+
+	        if (num_rows > 0)
+		{
+		    while ((row = mysql_fetch_row(result)))
+		    {
+			printf(_("Action zoneStart : %s\n"),row[0]);
+		        int stampOnly		= atoi(row[4]);
+		        int delayTimeMin	= atoi(row[3]);
+		        int idTable		= atoi(row[0]);
+		        int endNode		= atoi(row[1]);
+		        int endValue		= atoi(row[2]);
+		        int commandClassEnd	= atoi(row[4]);
+		        int instanceEnd		= atoi(row[5]);
+			int indexEnd		= atoi(row[6]);
+			int parentRule		= atoi(row[7]);
+			int parentsC1		= atoi(row[8]);
+			int parentsC2		= atoi(row[9]);
+
+			if (parentsC1 == parentsC2) {
+			    bool res = setValueByAll(g_homeId, endNode, commandClassEnd, instanceEnd, indexEnd, &endValue);
+    	    	    	    printf("ZONESTART = NODE %d : %d => %d\n", endNode, res, endValue);
+			
+			    if (parentRule > 0)
+				sprintf(query,"UPDATE zonesStart SET lastAction = NULL WHERE id = %d OR ruleId = %d", idTable, parentRule);
+			    else
+				sprintf(query,"UPDATE zonesStart SET lastAction = NULL WHERE id = %d", idTable, parentRule);
+			    mysql_query(&mysql,query);
+			}
+
+
+		    }
+
+		}
+
+		mysql_free_result(result);
+	    }
 
         pthread_mutex_unlock(&g_criticalSection);
 
