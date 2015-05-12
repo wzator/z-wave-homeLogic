@@ -1901,12 +1901,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 			if (nodeID == config.washer_node)
 			{
-				sprintf(info,_("- WASHER OFF - : Node %d Date %s "), nodeID, asctime(timeinfo));
+				sprintf(info,_("[%s] - WASHER OFF - : Node %d Date %s "), config.prefix, nodeID, asctime(timeinfo));
 				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%d,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
 			}
 			else
 			{
-				sprintf(info,_("- DISHWASHER OFF - : Node %d Date %s "), nodeID, asctime(timeinfo));
+				sprintf(info,_("[%s] - DISHWASHER OFF - : Node %d Date %s "), config.prefix, nodeID, asctime(timeinfo));
 				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%d,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, dishwasher_timestart.tm_year+1900,dishwasher_timestart.tm_mon+1,dishwasher_timestart.tm_mday,dishwasher_timestart.tm_hour,dishwasher_timestart.tm_min,dishwasher_timestart.tm_sec,nodeID);
 			}
 
@@ -1946,9 +1946,9 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    timeinfo = localtime(&rawtime);
 
 			    if (nodeID == config.washer_node)
-				sprintf(info,_("- WASHER FINISH - : Node %d Date %s "), nodeID, asctime(timeinfo));
+				sprintf(info,_("[%s] - WASHER FINISH - : Node %d Date %s "), config.prefix, nodeID, asctime(timeinfo));
 			    else
-				sprintf(info,_("- DISHWASHER FINISH - : Node %d Date %s"), nodeID, asctime(timeinfo));
+				sprintf(info,_("[%s] - DISHWASHER FINISH - : Node %d Date %s"), config.prefix, nodeID, asctime(timeinfo));
 
 			    if (strlen(config.gg_a1) > 0)
 		    	        RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
@@ -2035,12 +2035,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			if (nodeID == config.washer_node)
 			{
 			    washer_timestart = *localtime(&rawtime);
-			    sprintf(info,_("- WASHER ON - : Node %d Date %s"), nodeID, asctime(timeinfo));
+			    sprintf(info,_("[%s] - WASHER ON - : Node %d Date %s"), config.prefix, nodeID, asctime(timeinfo));
 			}
 			else
 			{
 			    dishwasher_timestart = *localtime(&rawtime);
-			    sprintf(info,_("- DISHWASHER ON - : Node %d Date %s"), nodeID, asctime(timeinfo));
+			    sprintf(info,_("[%s] - DISHWASHER ON - : Node %d Date %s"), config.prefix, nodeID, asctime(timeinfo));
 			}
 
 			int valpar = 0;
