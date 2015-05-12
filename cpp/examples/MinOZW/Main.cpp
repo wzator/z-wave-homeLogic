@@ -1312,16 +1312,17 @@ int tvManager(char *option, char *mkeys)
 	{
 	    RPC_SSHdo(config.tv_start, config.tv_smart, config.tv_login, config.tv_pass);
 
-
 		if (strlen(keys)>2)
 	        {
-    		    sleep(1500); /* CEC sloooow */
-	    	    char *p = strtok(keys,";");
+    		    usleep(9500000);/* WAIT FOR TV TO RUN */
+
+		    char *p = strtok(keys,";");
 		    while (p != NULL)
 		    {
 			std::string skey = p;
+			printf("SKEY: %s\n",p);
 
-    			sleep(500); /* CEC sloooow */
+    			sleep(2); /* CEC sloooow */
 			tvRemote(skey, "192.168.0.1", config.tv_ip);
 		        p = strtok(NULL, ";");
 		    }
