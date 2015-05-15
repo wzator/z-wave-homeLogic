@@ -70,6 +70,7 @@
 #include <ifaddrs.h>
 #include <locale.h>
 #include <libintl.h>
+#include <curl/curl.h>
 
 #define PACKETSIZE  64
 #define _(String) gettext (String)
@@ -130,6 +131,7 @@ struct config_type
 	int    washer_node;
 	int    dishwasher_node;
 	int    sms_commands;
+	int    sms_location;
 };
 
 
@@ -485,7 +487,7 @@ int RPC_LoadSMS()
 	for (int a=0; a<10; a++)
 	{
 	    sms.Number = 0;
-	    sms.SMS[0].Location = a;
+	    sms.SMS[0].Location = a + config.sms_location;
 	    sms.SMS[0].Folder = 0;
 
 	    error=GSM_GetSMS(s, &sms);
@@ -563,7 +565,7 @@ int RPC_LoadSMS()
 
 		}
 
-		smsD.Location = a;
+		smsD.Location = a + config.sms_location;
 		smsD.Folder = 0;
 		GSM_DeleteSMS(s, &smsD);
 	    }
@@ -1308,7 +1310,7 @@ int tvManager(char *option, char *mkeys)
 
 		if (strlen(keys)>2)
 	        {
-    		    usleep(9500000);/* WAIT FOR TV TO RUN */
+    		    usleep(11900000);/* WAIT FOR TV TO RUN */
 
 		    char *p = strtok(keys,";");
 		    while (p != NULL)
@@ -1868,7 +1870,8 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    // index = 8
 	    if (homeID == config.zwave_id && valueID.GetIndex() == 8 && id == 50 && (nodeID == config.washer_node || nodeID == config.dishwasher_node))
 	    {
-		float power = atof(dev_value);
+		double power = atof(dev_value);
+		printf("power: %f, %s\n", power,dev_value);
 		if (power == 0) // ping or power off
 		{
 		    if ((washer_status > 0 && washer_offcounter != -1 && nodeID == config.washer_node) || (dishwasher_status > 0 && dishwasher_offcounter != -1 && nodeID == config.dishwasher_node))
@@ -2641,6 +2644,12 @@ int get_configuration(struct config_type *config, char *path)
 			continue;
 		}
 
+		if ( (strcmp(token,"SMS_LOCATION") == 0) && (strlen(val) != 0) )
+		{
+			config->sms_location = atoi(val);
+			continue;
+		}
+
 		if ( (strcmp(token,"SMS_PHONE1") == 0) && (strlen(val) != 0) )
 		{
 			strcpy(config->sms_phone1, val);
@@ -2994,6 +3003,8 @@ static int makeTimer(char *name, timer_t *timerID, int expireMS, int intervalMS 
 
 int main(int argc, char* argv[]) {
     pthread_mutexattr_t mutexattr;
+
+    // Only dot
 
     int forked = fork();
 
