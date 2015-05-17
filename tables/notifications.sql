@@ -76,6 +76,10 @@ INSERT INTO `powerUsage` (`homeid`,`nodeId`,`value`,`mtimestamp`) VALUES (NEW.ho
 ON DUPLICATE KEY UPDATE `powerUsage`.`value` = NEW.valueINT, `powerUsage`.`mtimestamp` = NOW();
 END IF;
 
+IF (NEW.commandclass = 48 AND NEW.`instance` = 1 AND NEW.valueINT IS NOT NULL) THEN
+INSERT INTO `sensors` (`homeid`,`node`,`sensor`, `value`,`timestamp`) VALUES (NEW.homeid,NEW.node,NEW.`index`, NEW.valueINT,NOW())
+ON DUPLICATE KEY UPDATE `sensors`.`value` = NEW.valueINT, `sensors`.`timestamp` = NOW();
+END IF;
 
 END
 //
