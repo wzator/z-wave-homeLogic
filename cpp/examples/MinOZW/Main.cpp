@@ -1990,7 +1990,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		if (power > 0)
 		{
 
-		    if ((power < 15 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 1  && nodeID == config.dishwasher_node)) // maybe off
+		    if ((power < 14 && washer_status == 3 && nodeID == config.washer_node) || (dishwasher_status == 3 && power < 1  && nodeID == config.dishwasher_node)) // maybe off
 		    {
 
 			if (nodeID == config.washer_node)
