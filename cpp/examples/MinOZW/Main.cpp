@@ -1310,7 +1310,7 @@ int tvManager(char *option, char *mkeys)
 
 		if (strlen(keys)>2)
 	        {
-    		    usleep(11900000);/* WAIT FOR TV TO RUN */
+    		    usleep(15900000);/* WAIT FOR TV TO RUN */
 
 		    char *p = strtok(keys,";");
 		    while (p != NULL)
@@ -1318,7 +1318,7 @@ int tvManager(char *option, char *mkeys)
 			std::string skey = p;
 			printf("SKEY: %s\n",p);
 
-    			sleep(2); /* CEC sloooow */
+			usleep(6500000); /* CEC sloooow */
 			tvRemote(skey, "192.168.0.1", config.tv_ip);
 		        p = strtok(NULL, ";");
 		    }
