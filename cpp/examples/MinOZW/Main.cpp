@@ -1360,6 +1360,34 @@ int tvManager(char *option, char *mkeys)
 //-----------------------------------------------------------------------------
 
 
+void *smsNow(void * minfo)
+{
+	char info[1024];
+
+	sprintf(info,"%s",minfo);
+	int res = 0;
+
+	if (strlen(config.sms_phone1) > 0)
+    	    res = RPC_SendSMS(config.sms_phone1, (char *) info);
+
+	// if error try again
+    	if (res == -1) {
+	    usleep(900000);
+    	    res = RPC_SendSMS(config.sms_phone1, (char *) info);
+	}
+	
+	if (strlen(config.sms_phone2) > 0)
+	    res = RPC_SendSMS(config.sms_phone2, (char *) info);
+
+	// if error try again
+    	if (res == -1) {
+	    usleep(900000);
+    	    res = RPC_SendSMS(config.sms_phone2, (char *) info);
+	}
+
+	pthread_exit(NULL);
+}
+
 void alarm(char *info)
 {
 		if (strlen(config.gg_a1) > 0)
@@ -1370,20 +1398,9 @@ void alarm(char *info)
 
 		if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
 		{
-		    signal(SIGCHLD, SIG_IGN); // don't wait for children
-		    int forked = fork();
-
-    		    if (forked == 0)
-    		    {
-
-			if (strlen(config.sms_phone1) > 0)
-		    	    RPC_SendSMS(config.sms_phone1, info);
-
-			if (strlen(config.sms_phone2) > 0)
-			    RPC_SendSMS(config.sms_phone2, info);
-		
-			_exit(3);
-		    }
+		    pthread_t sms_thread; 
+		    pthread_create(&sms_thread, NULL, smsNow, info);
+		    usleep(900000);
 		}
 
 }
@@ -1956,20 +1973,9 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    //  fork for sms because too slow	
 			    if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
 			    {
-				signal(SIGCHLD, SIG_IGN); // don't wait for children
-				int forked = fork();
-
-    				if (forked == 0)
-    				{
-
-				    if (strlen(config.sms_phone1) > 0)
-		    			RPC_SendSMS(config.sms_phone1, info);
-
-				    if (strlen(config.sms_phone2) > 0)
-					RPC_SendSMS(config.sms_phone2, info);
-		
-				    _exit(3);
-				}
+				pthread_t sms_thread;
+				pthread_create(&sms_thread, NULL, smsNow, &info);
+				usleep(900000);
 			    }
 
 
@@ -2172,20 +2178,9 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		//  fork for sms because too slow
 		if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
 		{
-		    signal(SIGCHLD, SIG_IGN); // don't wait for children
-		    int forked = fork();
-
-    		    if (forked == 0)
-    		    {
-
-			if (strlen(config.sms_phone1) > 0)
-		    	    RPC_SendSMS(config.sms_phone1, info);
-
-			if (strlen(config.sms_phone2) > 0)
-			    RPC_SendSMS(config.sms_phone2, info);
-		
-			_exit(3);
-		    }
+			pthread_t sms_thread;
+			pthread_create(&sms_thread, NULL, smsNow, &info);
+			usleep(900000);
 		}
 
 
@@ -3499,21 +3494,9 @@ printf("Going ...\n");
 		    char info[4096];
 		    sprintf(info, "TEST SMS");
 
-	    	    signal(SIGCHLD, SIG_IGN); // don't wait for children
+			pthread_t sms_thread;
+			pthread_create(&sms_thread, NULL, smsNow, &info);
 
-		    int forked = fork();
-
-    		    if (forked == 0)
-    		    {
-
-			if (strlen(config.sms_phone1) > 0)
-		    	    RPC_SendSMS(config.sms_phone1, info);
-
-			if (strlen(config.sms_phone2) > 0)
-			    RPC_SendSMS(config.sms_phone2, info);
-		
-			_exit(3);
-		    }
 		}
 
                         //give list of devices
