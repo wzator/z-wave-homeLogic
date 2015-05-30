@@ -2128,7 +2128,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    int res = mysql_query(&mysql,query);
 	    if (res == 0) {
 		MYSQL_RES *result = mysql_store_result(&mysql);
-		printf("%s\n",query);
+//		printf("%s\n",query);
 		int num_rows = mysql_num_rows(result);
 		if (num_rows > 0 && res == 0)
 		{
@@ -2136,7 +2136,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    	    {
 			printf(_("Action zoneStart : %s\n"),row[0]);
 			int stampOnly		= atoi(row[4]);
-			int delayTimeMin		= atoi(row[3]);
+//			int delayTimeMin		= atoi(row[3]);
 			int idTable			= atoi(row[0]);
 			int endNode			= atoi(row[1]);
 			int endValue		= atoi(row[2]);
@@ -2971,8 +2971,8 @@ timerHandler(sigval_t t )
 		    while ((row = mysql_fetch_row(result)))
 		    {
 			printf(_("Action zoneStart : %s\n"),row[0]);
-		        int stampOnly		= atoi(row[4]);
-		        int delayTimeMin	= atoi(row[3]);
+//		        int stampOnly		= atoi(row[4]);
+//		        int delayTimeMin	= atoi(row[3]);
 		        int idTable		= atoi(row[0]);
 		        int endNode		= atoi(row[1]);
 		        int endValue		= atoi(row[2]);
