@@ -148,6 +148,7 @@ struct tm dishwasher_timestart;
 
 static list<NodeInfo*> g_nodes;
 static pthread_mutex_t g_criticalSection;
+static pthread_mutex_t g_criticalSectionSMS;
 static pthread_cond_t initCond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t initMutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -350,6 +351,7 @@ void error_handler(GSM_Error error, GSM_StateMachine *s)
 		printf(_("ERROR: %s\n"), GSM_ErrorString(error));
 		if (GSM_IsConnected(s))
 			GSM_TerminateConnection(s);
+		pthread_mutex_unlock(&g_criticalSectionSMS);
 		exit(error);
 	}
 }
@@ -390,7 +392,11 @@ int SMSsendNow(GSM_StateMachine *s, GSM_SMSMessage *smsO, char *message_text)
 
         sms_send_status = ERR_TIMEOUT;
 	error = GSM_SendSMS(s, smsO);
-        error_handler(error,s);
+
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	while (!gshutdown) {
     	    GSM_ReadDevice(s, TRUE);
@@ -413,6 +419,13 @@ int SMSsendNow(GSM_StateMachine *s, GSM_SMSMessage *smsO, char *message_text)
 
 int RPC_LoadSMS()
 {
+
+	printf("MUTEX_LOCK: LoadSMS\n");
+	pthread_mutex_lock(&g_criticalSectionSMS);
+	printf("MUTEX_LOCK_OK: LoadSMS\n");
+
+	usleep(5900000);
+
 	// GSM
 	GSM_MultiSMSMessage 	sms;
 	GSM_SMSMessage 	smsD;
@@ -435,8 +448,10 @@ int RPC_LoadSMS()
 
 	/* Allocates state machine */
 	s = GSM_AllocStateMachine();
-	if (s == NULL)
+	if (s == NULL) {
+		pthread_mutex_unlock(&g_criticalSectionSMS);
 		return 3;
+	}
 
 	cfg = GSM_GetConfig(s, 0);
 
@@ -452,14 +467,18 @@ int RPC_LoadSMS()
 	/* Connect to phone */
 	/* 1 means number of replies you want to wait for */
 	error = GSM_InitConnection(s, 3);
-	if (error_handler_back(error,s) == false)
-	    return 0;
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	GSM_SetSendSMSStatusCallback(s, send_sms_callback, NULL);
 
 	error = GSM_GetSMSFolders(s, &folders);
-	if (error_handler_back(error,s) == false)
-	    return 0;;
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	memset(&sms, 0, sizeof(sms));
 	memset(&smsD, 0, sizeof(smsD));
@@ -467,8 +486,10 @@ int RPC_LoadSMS()
 	/* We need to know SMSC number */
 	PhoneSMSC.Location = 1;
 	error = GSM_GetSMSC(s, &PhoneSMSC);
-	if (error_handler_back(error,s) == false)
-	    return 0;
+	if (error_handler_back(error,s) == false) {
+    	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	/* Read all messages */
 	error = ERR_NONE;
@@ -575,11 +596,16 @@ int RPC_LoadSMS()
 	/* Terminate connection */
 	error = GSM_TerminateConnection(s);
 
-	if (error_handler_back(error,s) == false)
-	    return 0;
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	/* Free up used memory */
 	GSM_FreeStateMachine(s);
+
+
+	pthread_mutex_unlock(&g_criticalSectionSMS);
 
 	return 0;
 
@@ -588,7 +614,10 @@ int RPC_LoadSMS()
 int RPC_SendSMS(char *recipient_number, char *message_text)
 {
 // GSM
-
+	printf("MUTEX_LOCK: SendSMS\n");
+	pthread_mutex_lock(&g_criticalSectionSMS);
+	printf("MUTEX_LOCK_OK: SendSMS\n");
+	usleep(15900000);
 	GSM_StateMachine *s;
 	GSM_Config *cfg;
 	GSM_Error error;
@@ -626,8 +655,10 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 
 	/* Allocates state machine */
 	s = GSM_AllocStateMachine();
-	if (s == NULL)
+	if (s == NULL) {
+		pthread_mutex_unlock(&g_criticalSectionSMS);
 		return 3;
+	}
 
 	// Get pointer to config structure
 	cfg = GSM_GetConfig(s, 0);
@@ -644,7 +675,11 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 	/* Connect to phone */
 	/* 1 means number of replies you want to wait for */
 	error = GSM_InitConnection(s, 3);
-	error_handler(error,s);
+
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	/* Set callback for message sending */
 	/* This needs to be done after initiating connection */
@@ -653,7 +688,11 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 	/* We need to know SMSC number */
 	PhoneSMSC.Location = 1;
 	error = GSM_GetSMSC(s, &PhoneSMSC);
-	error_handler(error,s);
+
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	/* Set SMSC number in message */
 	CopyUnicodeString(sms.SMSC.Number, PhoneSMSC.Number);
@@ -666,7 +705,11 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 
 	/* Send message */
 	error = GSM_SendSMS(s, &sms);
-	error_handler(error,s);
+
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	/* Wait for network reply */
 	while (!gshutdown) {
@@ -685,10 +728,16 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 
 	/* Terminate connection */
 	error = GSM_TerminateConnection(s);
-	error_handler(error,s);
+
+	if (error_handler_back(error,s) == false) {
+	    pthread_mutex_unlock(&g_criticalSectionSMS);
+	    return -1;
+	}
 
 	/* Free up used memory */
 	GSM_FreeStateMachine(s);
+
+	pthread_mutex_unlock(&g_criticalSectionSMS);
 
 	return return_value;
 }
@@ -2998,8 +3047,7 @@ static int makeTimer(char *name, timer_t *timerID, int expireMS, int intervalMS 
 
 int main(int argc, char* argv[]) {
     pthread_mutexattr_t mutexattr;
-
-    // Only dot
+    pthread_mutexattr_t mutexattrSMS;
 
     int forked = fork();
 
@@ -3033,6 +3081,13 @@ int main(int argc, char* argv[]) {
                 mysql_errno(&mysql), mysql_error(&mysql));
                 exit(0);
     }
+
+    pthread_mutexattr_init(&mutexattrSMS);
+    pthread_mutexattr_settype(&mutexattrSMS, PTHREAD_MUTEX_ERRORCHECK);
+    pthread_mutexattr_setpshared(&mutexattrSMS, PTHREAD_PROCESS_SHARED);
+
+    pthread_mutex_init(&g_criticalSectionSMS, &mutexattrSMS);
+    pthread_mutexattr_destroy(&mutexattrSMS);
 
 
     pthread_mutexattr_init(&mutexattr);
@@ -3619,5 +3674,6 @@ printf("Going ...\n");
     Manager::Destroy();
     Options::Destroy();
     pthread_mutex_destroy(&g_criticalSection);
+    pthread_mutex_destroy(&g_criticalSectionSMS);
     return 0;
 }
