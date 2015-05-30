@@ -47,7 +47,7 @@ endif
 
 $(OBJDIR)/MinOZW:	$(patsubst %.cpp,$(OBJDIR)/%.o,$(minozwsrc))
 	@echo "Linking $(OBJDIR)/MinOZW"
-	$(LD) $(LDFLAGS) -o $@ $< $(LIBS) -pthread -ludev -L/usr/lib/mysql -lmysqlclient -L/usr/local/lib -lgadu -lGammu -lstdc++ -lssh
+	$(LD) $(LDFLAGS) -o $@ $< $(LIBS) -pthread -ludev -L/usr/lib/mysql -lmysqlclient -L/usr/local/lib -lgadu -lGammu -lstdc++ -lssh -lrt -g -lcurl
 
 $(top_builddir)/MinOZW: $(top_srcdir)/cpp/examples/MinOZW/MinOZW.in $(OBJDIR)/MinOZW
 	@echo "Creating Temporary Shell Launch Script"
