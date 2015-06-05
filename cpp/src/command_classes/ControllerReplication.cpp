@@ -25,17 +25,18 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "ControllerReplication.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/ControllerReplication.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Driver.h"
 #include "Node.h"
-#include "Log.h"
+#include "Utils.h"
 
-#include "ValueByte.h"
-#include "ValueList.h"
-#include "ValueButton.h"
+
+#include "value_classes/ValueByte.h"
+#include "value_classes/ValueList.h"
+#include "value_classes/ValueButton.h"
 
 using namespace OpenZWave;
 
@@ -54,7 +55,7 @@ enum
 	ControllerReplicationIndex_Replicate
 };
 
-static char const* c_controllerReplicationFunctionNames[] = 
+static char const* c_controllerReplicationFunctionNames[] =
 {
 	"Groups",
 	"Group Names",
@@ -115,7 +116,7 @@ bool ControllerReplication::HandleMsg
 		}
 	}
 
-	Msg* msg = new Msg( "ControllerReplication Command Complete", GetNodeId(), REQUEST, FUNC_ID_ZW_REPLICATION_COMMAND_COMPLETE, false, false );
+	Msg* msg = new Msg( "ControllerReplicationCmd_Complete", GetNodeId(), REQUEST, FUNC_ID_ZW_REPLICATION_COMMAND_COMPLETE, false, false );
 	GetDriver()->SendMsg( msg, Driver::MsgQueue_Command );
 	return true;
 }
@@ -243,7 +244,7 @@ void ControllerReplication::SendNextData
 			}
 		}
 		i = m_nodeId == -1 ? 0 : m_nodeId+1;
-		GetDriver()->LockNodes();
+		LockGuard LG(GetDriver()->m_nodeMutex);
 		while( i < 256 )
 		{
 			if( GetDriver()->m_nodes[i] )
@@ -258,17 +259,16 @@ void ControllerReplication::SendNextData
 			}
 			i++;
 		}
-		GetDriver()->ReleaseNodes();
 		m_nodeId = i;
 		break;
 	}
 	if( i < 255 )
 	{
-		Msg* msg = new Msg( "Replication Send", m_targetNodeId, REQUEST, FUNC_ID_ZW_REPLICATION_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
+		Msg* msg = new Msg( (m_groupName.length() > 0 ? "ControllerReplicationCmd_TransferGroupName" : "ControllerReplicationCmd_TransferGroup"), m_targetNodeId, REQUEST, FUNC_ID_ZW_REPLICATION_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
 		msg->Append( m_targetNodeId );
 		if( m_groupName.length() > 0 )
-		{		
-			msg->Append( m_groupName.length() + 4 );
+		{
+			msg->Append((uint8) (m_groupName.length() + 4 ));
 			msg->Append( GetCommandClassId() );
 			msg->Append( ControllerReplicationCmd_TransferGroupName );
 			msg->Append( 0 );
@@ -317,7 +317,7 @@ void ControllerReplication::CreateVars
 		{
 			item.m_label = c_controllerReplicationFunctionNames[i];
 			item.m_value = ControllerReplicationCmd_TransferGroup + i;
-			items.push_back( item ); 
+			items.push_back( item );
 		}
 
 		node->CreateValueList( ValueID::ValueGenre_System, GetCommandClassId(), _instance, ControllerReplicationIndex_Function, "Functions", "", false, false, 1, items, 0, 0 );

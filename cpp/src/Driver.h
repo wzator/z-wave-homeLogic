@@ -33,11 +33,12 @@
 #include <list>
 
 #include "Defs.h"
-#include "ValueID.h"
+#include "value_classes/ValueID.h"
 #include "Node.h"
-#include "Event.h"
-#include "Mutex.h"
-#include "TimeStamp.h"
+#include "platform/Event.h"
+#include "platform/Mutex.h"
+#include "platform/TimeStamp.h"
+#include "aes/aescpp.h"
 
 namespace OpenZWave
 {
@@ -50,7 +51,7 @@ namespace OpenZWave
 	class ControllerReplication;
 	class Notification;
 
-	/** \brief The Driver class handles communication between OpenZWave 
+	/** \brief The Driver class handles communication between OpenZWave
 	 *  and a device attached via a serial port (typically a controller).
 	 */
 	class OPENZWAVE_EXPORT Driver
@@ -70,6 +71,8 @@ namespace OpenZWave
 		friend class NoOperation;
 		friend class SceneActivation;
 		friend class WakeUp;
+		friend class Security;
+		friend class Msg;
 
 	//-----------------------------------------------------------------------------
 	//	Controller Interfaces
@@ -86,7 +89,7 @@ namespace OpenZWave
 	// Construction / Destruction
 	//-----------------------------------------------------------------------------
 	private:
-		/** 
+		/**
 		 *  Creates threads, events and initializes member variables and the node array.
 		 */
 		Driver( string const& _controllerPath, ControllerInterface const& _interface );
@@ -105,9 +108,9 @@ namespace OpenZWave
 		 */
 		static void DriverThreadEntryPoint( Event* _exitEvent, void* _context );
 		/**
-		 *  ThreadProc for driverThread.  This is where all the "action" takes place.  
+		 *  ThreadProc for driverThread.  This is where all the "action" takes place.
 		 *  <p>
-		 *  First, the thread is initialized by calling Init().  If Init() fails, it will be retried 
+		 *  First, the thread is initialized by calling Init().  If Init() fails, it will be retried
 		 *  every 5 seconds for the first two minutes and every 30 seconds thereafter.
 		 *  <p>
 		 *  After the thread is successfully initialized, the thread enters a loop with the
@@ -124,7 +127,7 @@ namespace OpenZWave
 		 */
 		void DriverThreadProc( Event* _exitEvent );
 		/**
-		 *  Initialize the controller.  Open the specified serial port, start the serialThread 
+		 *  Initialize the controller.  Open the specified serial port, start the serialThread
 		 *  and pollThread, then send a NAK to the device [presumably to flush it].
 		 *  <p>
 		 *  Then queue the commands to retrieve the Z-Wave interface:
@@ -149,7 +152,7 @@ namespace OpenZWave
 		bool					m_init;					/**< Set to true once the driver has been initialised */
 		bool					m_awakeNodesQueried;	/**< Set to true once the driver has polled all awake nodes */
 		bool					m_allNodesQueried;		/**< Set to true once the driver has polled all nodes */
-		bool					m_notifytransactions; 
+		bool					m_notifytransactions;
 		TimeStamp				m_startTime;			/**< Time this driver started (for log report purposes) */
 
 	//-----------------------------------------------------------------------------
@@ -190,7 +193,7 @@ namespace OpenZWave
 
 
 		uint32 GetHomeId()const{ return m_homeId; }
-		uint8 GetNodeId()const{ return m_nodeId; }
+		uint8 GetControllerNodeId()const{ return m_Controller_nodeId; }
 		uint8 GetSUCNodeId()const{ return m_SUCNodeId; }
 		uint16 GetManufacturerId()const{ return m_manufacturerId; }
 		uint16 GetProductType()const{ return m_productType; }
@@ -204,13 +207,13 @@ namespace OpenZWave
 			int32 count = 0;
 			for( int32 i=0; i<MsgQueue_Count; ++i )
 			{
-				count += m_msgQueue[i].size();
+				count += (int32) (m_msgQueue[i].size());
 			}
-			return count; 
+			return count;
 		}
 
 		/**
-		 *  A version of GetNode that does not have the protective "lock" and "release" requirement.  
+		 *  A version of GetNode that does not have the protective "lock" and "release" requirement.
 		 *  This function can be used within driverThread, which "knows" that the node will not be
 		 *  changed or deleted while it is being used.
 		 *  \param _nodeId The nodeId (index into the node array) identifying the node to be returned
@@ -232,17 +235,17 @@ namespace OpenZWave
 		/**
 		 *  Lock the nodes so no other thread can modify them.
 		 */
-		void LockNodes();
+		//void LockNodes();
 		/**
 		 *  Release the lock on the nodes so other threads can modify them.
 		 */
-		void ReleaseNodes();
+		//void ReleaseNodes();
 
 		ControllerInterface			m_controllerInterfaceType;						// Specifies the controller's hardware interface
 		string					m_controllerPath;							// name or path used to open the controller hardware.
 		Controller*				m_controller;								// Handles communications with the controller hardware.
 		uint32					m_homeId;									// Home ID of the Z-Wave controller.  Not valid until the DriverReady notification has been received.
-		
+
 		string					m_libraryVersion;							// Verison of the Z-Wave Library used by the controller.
 		string					m_libraryTypeName;							// Name describing the library type.
 		uint8					m_libraryType;								// Type of library used by the controller.
@@ -256,7 +259,7 @@ namespace OpenZWave
 		uint8					m_initVersion;								// Version of the Serial API used by the controller.
 		uint8					m_initCaps;									// Set of flags indicating the serial API capabilities (See IsSlave, HasTimerSupport, IsPrimaryController and IsStaticUpdateController above).
 		uint8					m_controllerCaps;							// Set of flags indicating the controller's capabilities (See IsInclusionController above).
-		uint8					m_nodeId;									// Z-Wave Controller's own node ID.
+		uint8					m_Controller_nodeId;									// Z-Wave Controller's own node ID.
 		Node*					m_nodes[256];								// Array containing all the node objects.
 		Mutex*					m_nodeMutex;								// Serializes access to node data
 
@@ -286,7 +289,7 @@ namespace OpenZWave
 		 *  The response message contains a bitmap identifying which of the 232 possible nodes
 		 *  in the network are actually present.  These bitmap values are compared with the
 		 *  node map (read in from zwcfg_0x[homeid].xml) to see if the node has already been registered
-		 *  by the OpenZWave library.  If it has (the log will show it as "Known") and this is 
+		 *  by the OpenZWave library.  If it has (the log will show it as "Known") and this is
 		 *  the first time this message was sent (m_init is false), then AddNodeQuery() is called
 		 *  to retrieve its current state.  If this is a "New" node to OpenZWave, then InitNode()
 		 *  is called.
@@ -378,12 +381,15 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 		 *  stages--Node::QueryStage_None).  This function will send Notification::Type_NodeAdded
 		 *  and Notification::Type_NodeRemoved messages to identify these modifications.
 		 *  \param _nodeId The node ID of the node to create and query.
-		 *  \see Notification::Type_NodeAdded, Notification::Type_NodeRemoved, Node::QueryStage_None, 
+		 *  \param newNode If this is a new Node added to the network, or we are just creating when we reload.
+		 *  \param _protocolInfo if this is called via a AddNode command, then this would be the Device Classes, and CommandClass list
+		 *  \param _length The length of the _protocolInfo field
+		 *  \see Notification::Type_NodeAdded, Notification::Type_NodeRemoved, Node::QueryStage_None,
 		 */
-		void InitNode( uint8 const _nodeId );
+		void InitNode( uint8 const _nodeId, bool newNode = false, bool secure = false, uint8 const *_protocolInfo = NULL, uint8 const _length = 0);
 
 		void InitAllNodes();												// Delete all nodes and fetch the data from the Z-Wave network again.
-		
+
 		bool IsNodeListeningDevice( uint8 const _nodeId );
 		bool IsNodeFrequentListeningDevice( uint8 const _nodeId );
 		bool IsNodeBeamingDevice( uint8 const _nodeId );
@@ -433,8 +439,8 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 	//-----------------------------------------------------------------------------
 	// Controller commands
 	//-----------------------------------------------------------------------------
-	public:	
-		/** 
+	public:
+		/**
 		 * Controller Commands.
 		 * Commands to be used with the BeginControllerCommand method.
 		 * \see Manager::BeginControllerCommand
@@ -460,7 +466,7 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 			ControllerCommand_DeleteButton					/**< Delete id that tracks handheld button presses */
 		};
 
-		/** 
+		/**
 		 * Controller States.
 		 * States reported via the callback handler passed into the BeginControllerCommand method.
 		 * \see Manager::BeginControllerCommand
@@ -526,48 +532,14 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 			bool					m_controllerAdded;
 			uint8					m_controllerCommandNode;
 			uint8					m_controllerCommandArg;
+			uint8					m_controllerDeviceProtocolInfo[254];
+			uint8 					m_controllerDeviceProtocolInfoLength;
 		};
 
 		ControllerCommandItem*			m_currentControllerCommand;
 
 		void DoControllerCommand();
-		void UpdateControllerState( ControllerState const _state, ControllerError const _error = ControllerError_None )
-		{
-			if( m_currentControllerCommand != NULL )
-			{
-				if( _state != m_currentControllerCommand->m_controllerState )
-				{
-					m_currentControllerCommand->m_controllerStateChanged = true;
-					m_currentControllerCommand->m_controllerState = _state;
-					switch( _state )
-					{
-						case ControllerState_Error:
-						case ControllerState_Cancel:
-						case ControllerState_Failed:
-						case ControllerState_Sleeping:
-						case ControllerState_NodeFailed:
-						case ControllerState_NodeOK:
-						case ControllerState_Completed:
-						{
-							m_currentControllerCommand->m_controllerCommandDone = true;
-							m_sendMutex->Lock();
-							m_queueEvent[MsgQueue_Controller]->Set();
-							m_sendMutex->Unlock();
-							break;
-						}
-						default:
-						{
-							break;
-						}
-					}
-
-				}
-				if( _error != ControllerError_None )
-				{
-					m_currentControllerCommand->m_controllerReturnError = _error;
-				}
-			}
-		}
+		void UpdateControllerState( ControllerState const _state, ControllerError const _error = ControllerError_None );
 
 		uint8					m_SUCNodeId;
 
@@ -582,6 +554,7 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 		enum MsgQueue
 		{
 			MsgQueue_Command = 0,
+			MsgQueue_Security,
 			MsgQueue_NoOp,
 			MsgQueue_Controller,
 			MsgQueue_WakeUp,
@@ -629,7 +602,12 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 		// Requests to be sent to nodes are assigned to one of five queues.
 		// From highest to lowest priority, these are
 		//
-		// 1)	The command queue, for controller commands.  This is the highest
+		// 0)   The security queue, for handling encrypted messages.  This is the
+		//              highest priority send queue, because the security process inserts
+		//              messages to handle the encryption process that must be sent before
+		//              a new message can be wrapped.
+		//
+		// 1)	The command queue, for controller commands.  This is the 2nd highest
 		//		priority send queue, because the controller command processes are not
 		//		permitted to be interupted by other requests.
 		//
@@ -639,7 +617,7 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 		// 3)	The No Operation command class queue. This is used for device probing
 		//		at startup as well as network diagostics.
 		//
-		// 4)	The wakeup queue.  This holds messages that have been held for a 
+		// 4)	The wakeup queue.  This holds messages that have been held for a
 		//		sleeping device that has now woken up.  These get a high priority
 		//		because such devices do not stay awake for very long.
 		//
@@ -661,11 +639,11 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 			MsgQueueCmd_QueryStageComplete,
 			MsgQueueCmd_Controller
 		};
-		
+
 		class MsgQueueItem
 		{
 		public:
-			MsgQueueItem() : 
+			MsgQueueItem() :
 				m_msg(NULL),
 				m_nodeId(0),
 				m_queryStage(Node::QueryStage_None),
@@ -720,8 +698,8 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 	//-----------------------------------------------------------------------------
 	// Virtual Node commands
 	//-----------------------------------------------------------------------------
-	public:	
-		/** 
+	public:
+		/**
 		 * Virtual Node Commands.
 		 * Commands to be used with virtual nodes.
 		 */
@@ -740,7 +718,7 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 	//-----------------------------------------------------------------------------
 	// SwitchAll
 	//-----------------------------------------------------------------------------
-	private:		
+	private:
 		// The public interface is provided via the wrappers in the Manager class
 		void SwitchAllOn();
 		void SwitchAllOff();
@@ -748,7 +726,7 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 	//-----------------------------------------------------------------------------
 	// Configuration Parameters	(wrappers for the Node methods)
 	//-----------------------------------------------------------------------------
-	private:		
+	private:
 		// The public interface is provided via the wrappers in the Manager class
 		bool SetConfigParam( uint8 const _nodeId, uint8 const _param, int32 _value, uint8 const _size );
 		void RequestConfigParam( uint8 const _nodeId, uint8 const _param );
@@ -756,7 +734,7 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 	//-----------------------------------------------------------------------------
 	// Groups (wrappers for the Node methods)
 	//-----------------------------------------------------------------------------
-	private:		
+	private:
 		// The public interface is provided via the wrappers in the Manager class
 		uint8 GetNumGroups( uint8 const _nodeId );
 		uint32 GetAssociations( uint8 const _nodeId, uint8 const _groupIdx, uint8** o_associations );
@@ -835,6 +813,28 @@ OPENZWAVE_EXPORT_WARNINGS_ON
 		uint32 m_broadcastWriteCnt;		// Number of broadcasts sent
 		//time_t m_commandStart;	// Start time of last command
 		//time_t m_timeoutLost;		// Cumulative time lost to timeouts
+
+
+	//-----------------------------------------------------------------------------
+	//	Security Command Class Related (Version 1.1)
+	//-----------------------------------------------------------------------------
+	public:
+		aes_encrypt_ctx *GetAuthKey();
+		aes_encrypt_ctx *GetEncKey();
+		bool isNetworkKeySet();
+
+	private:
+		bool initNetworkKeys(bool newnode);
+		uint8 *GetNetworkKey();
+		bool SendEncryptedMessage();
+		bool SendNonceRequest(string logmsg);
+		void SendNonceKey(uint8 nodeId, uint8 *nonce);
+		aes_encrypt_ctx *AuthKey;
+		aes_encrypt_ctx *EncryptKey;
+		uint8 m_nonceReportSent;
+		uint8 m_nonceReportSentAttempt;
+		bool m_inclusionkeySet;
+
 	};
 
 } // namespace OpenZWave

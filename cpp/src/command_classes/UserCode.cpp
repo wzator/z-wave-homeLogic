@@ -26,13 +26,14 @@
 //-----------------------------------------------------------------------------
 
 #include "tinyxml.h"
-#include "CommandClasses.h"
-#include "UserCode.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/UserCode.h"
 #include "Node.h"
-#include "Log.h"
+#include "Options.h"
+#include "platform/Log.h"
 
-#include "ValueByte.h"
-#include "ValueRaw.h"
+#include "value_classes/ValueByte.h"
+#include "value_classes/ValueRaw.h"
 
 using namespace OpenZWave;
 
@@ -47,7 +48,7 @@ enum UserCodeCmd
 
 enum
 {
-	UserCodeIndex_Unknown		= 0,
+	UserCodeIndex_Refresh	= 254,
 	UserCodeIndex_Count		= 255
 };
 
@@ -65,10 +66,13 @@ UserCode::UserCode
 	CommandClass( _homeId, _nodeId ),
 	m_queryAll( false ),
 	m_currentCode( 0 ),
-	m_userCodeCount( 0 )
+	m_userCodeCount( 0 ),
+	m_refreshUserCodes(false)
 {
 	SetStaticRequest( StaticRequest_Values );
 	memset( m_userCodesStatus, 0xff, sizeof(m_userCodesStatus) );
+	Options::Get()->GetOptionAsBool("RefreshAllUserCodes", &m_refreshUserCodes );
+
 }
 
 //-----------------------------------------------------------------------------
@@ -119,7 +123,7 @@ bool UserCode::RequestState
 	bool requests = false;
 	if( ( _requestFlags & RequestFlag_Static ) && HasStaticRequest( StaticRequest_Values ) )
 	{
-		requests |= RequestValue( _requestFlags, 0xff, _instance, _queue );
+		requests |= RequestValue( _requestFlags, UserCodeIndex_Count, _instance, _queue );
 	}
 
 	if( _requestFlags & RequestFlag_Session )
@@ -157,7 +161,7 @@ bool UserCode::RequestValue
 		Log::Write(  LogLevel_Info, GetNodeId(), "UserNumberCmd_Get Not Supported on this node");
 		return false;
 	}
-	if( _userCodeIdx == 0xff )
+	if( _userCodeIdx == UserCodeIndex_Count )
 	{
 		// Get number of supported user codes.
 		Msg* msg = new Msg( "UserNumberCmd_Get", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
@@ -169,7 +173,11 @@ bool UserCode::RequestValue
 		GetDriver()->SendMsg( msg, _queue );
 		return true;
 	}
-
+	if (_userCodeIdx == 0)
+	{
+		Log::Write( LogLevel_Warning, GetNodeId(), "UserCodeCmd_Get with Index 0 not Supported");
+		return false;
+	}
 	Msg* msg = new Msg( "UserCodeCmd_Get", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
 	msg->Append( GetNodeId() );
 	msg->Append( 3 );
@@ -224,16 +232,16 @@ bool UserCode::HandleMsg
 			for( uint8 i = 0; i <= m_userCodeCount; i++ )
 			{
 				char str[16];
-
-				if( i == 0 )
+				if (i == 0)
 				{
-					snprintf( str, sizeof(str), "Unknown Code" );
+					snprintf( str, sizeof(str), "Enrollment Code");
+					node->CreateValueRaw( ValueID::ValueGenre_User, GetCommandClassId(), _instance, i, str, "", true, false, data, UserCodeLength, 0 );
 				}
 				else
 				{
-					snprintf( str, sizeof(str), "Code %d", i );
+					snprintf( str, sizeof(str), "Code %d:", i);
+					node->CreateValueRaw( ValueID::ValueGenre_User, GetCommandClassId(), _instance, i, str, "", false, false, data, UserCodeLength, 0 );
 				}
-				node->CreateValueRaw( ValueID::ValueGenre_User, GetCommandClassId(), _instance, i, str, "", false, false, data, UserCodeLength, 0 );
 			}
 		}
 		return true;
@@ -258,13 +266,21 @@ bool UserCode::HandleMsg
 		Log::Write( LogLevel_Info, GetNodeId(), "Received User Code Report from node %d for User Code %d (%s)", GetNodeId(), i, CodeStatus( _data[2] ).c_str() );
 		if( m_queryAll && i == m_currentCode )
 		{
-			if( ++i <= m_userCodeCount )
-			{
-				m_currentCode = i;
-				RequestValue( 0, m_currentCode, _instance, Driver::MsgQueue_Query );
-			}
-			else
-			{
+
+			if (m_refreshUserCodes || (_data[2] != UserCode_Available)) {
+				if( ++i <= m_userCodeCount )
+				{
+					m_currentCode = i;
+					RequestValue( 0, m_currentCode, _instance, Driver::MsgQueue_Query );
+				}
+				else
+				{
+					m_queryAll = false;
+					/* we might have reset this as part of the RefreshValues Button Value */
+					Options::Get()->GetOptionAsBool("RefreshAllUserCodes", &m_refreshUserCodes );
+				}
+			} else {
+				Log::Write( LogLevel_Info, GetNodeId(), "Not Requesting additional UserCode Slots as RefreshAllUserCodes is false, and slot %d is available", i);
 				m_queryAll = false;
 			}
 		}
@@ -283,7 +299,7 @@ bool UserCode::SetValue
 	Value const& _value
 )
 {
-	if( ValueID::ValueType_Raw == _value.GetID().GetType() )
+	if( (ValueID::ValueType_Raw == _value.GetID().GetType()) && (_value.GetID().GetIndex() < UserCodeIndex_Refresh) )
 	{
 		ValueRaw const* value = static_cast<ValueRaw const*>(&_value);
 		uint8* s = value->GetValue();
@@ -294,7 +310,7 @@ bool UserCode::SetValue
 			return false;
 		}
 		m_userCodesStatus[value->GetID().GetIndex()] = UserCode_Occupied;
-		Msg* msg = new Msg( "Set UserCode", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+		Msg* msg = new Msg( "UserCodeCmd_Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 		msg->SetInstance( this, _value.GetID().GetInstance() );
 		msg->Append( GetNodeId() );
 		msg->Append( 4 + len );
@@ -310,7 +326,14 @@ bool UserCode::SetValue
 		GetDriver()->SendMsg( msg, Driver::MsgQueue_Send );
 		return true;
 	}
-
+	if ( (ValueID::ValueType_Button == _value.GetID().GetType()) && (_value.GetID().GetIndex() == UserCodeIndex_Refresh) )
+	{
+		m_refreshUserCodes = true;
+		m_currentCode = 1;
+		m_queryAll = true;
+		RequestValue( 0, m_currentCode, _value.GetID().GetInstance(), Driver::MsgQueue_Query );
+		return true;
+	}
 	return false;
 }
 
@@ -327,5 +350,6 @@ void UserCode::CreateVars
 	if( Node* node = GetNodeUnsafe() )
 	{
 		node->CreateValueByte( ValueID::ValueGenre_System, GetCommandClassId(), _instance, UserCodeIndex_Count, "Code Count", "", true, false, 0, 0 );
+		node->CreateValueButton( ValueID::ValueGenre_System, GetCommandClassId(), _instance, UserCodeIndex_Refresh, "Refresh All UserCodes", 0);
 	}
 }

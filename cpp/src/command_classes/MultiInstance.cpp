@@ -26,15 +26,15 @@
 //-----------------------------------------------------------------------------
 
 #include "tinyxml.h"
-#include "CommandClasses.h"
-#include "Basic.h"
-#include "MultiInstance.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/Basic.h"
+#include "command_classes/MultiInstance.h"
+#include "command_classes/NoOperation.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Driver.h"
 #include "Node.h"
-#include "Log.h"
-#include "NoOperation.h"
+#include "platform/Log.h"
 
 using namespace OpenZWave;
 
@@ -42,39 +42,40 @@ using namespace OpenZWave;
 // the likely number of calls to MultiChannelCmd_EndPointFind.
 uint8 const c_genericClass[] =
 {
-	0x21,		// Multilevel Sensor
-	0x20,		// Binary Sensor
-	0x31,		// Meter
-	0x08,		// Thermostat
-	0x11,		// Multilevel Switch
-	0x10,		// Binary Switch
-	0x12,		// Remote Switch
-	0xa1,		// Alarm Sensor
-	0x16,		// Ventilation
-	0x30,		// Pulse Meter
-	0x40,		// Entry Control
-	0x13,		// Toggle Switch
-	0x03,		// AV Control Point
-	0x04,		// Display
-	0x00		// End of list
+		0x21,		// Multilevel Sensor
+		0x20,		// Binary Sensor
+		0x31,		// Meter
+		0x08,		// Thermostat
+		0x11,		// Multilevel Switch
+		0x10,		// Binary Switch
+		0x12,		// Remote Switch
+		0xa1,		// Alarm Sensor
+		0x16,		// Ventilation
+		0x30,		// Pulse Meter
+		0x40,		// Entry Control
+		0x13,		// Toggle Switch
+		0x03,		// AV Control Point
+		0x04,		// Display
+		0x00		// End of list
 };
 
 char const* c_genericClassName[] =
 {
-	"Multilevel Sensor",
-	"Binary Sensor",
-	"Meter",
-	"Thermostat",
-	"Multilevel Switch",
-	"Binary Switch",
-	"Remote Switch",
-	"Alarm Sensor",
-	"Ventilation",
-	"Pulse Meter",
-	"Entry Control",
-	"Toggle Switch",
-	"AV Control Point",
-	"Display"
+		"Multilevel Sensor",
+		"Binary Sensor",
+		"Meter",
+		"Thermostat",
+		"Multilevel Switch",
+		"Binary Switch",
+		"Remote Switch",
+		"Alarm Sensor",
+		"Ventilation",
+		"Pulse Meter",
+		"Entry Control",
+		"Toggle Switch",
+		"AV Control Point",
+		"Display",
+		"Unknown"
 };
 
 //-----------------------------------------------------------------------------
@@ -83,14 +84,14 @@ char const* c_genericClassName[] =
 //-----------------------------------------------------------------------------
 MultiInstance::MultiInstance
 (
-	uint32 const _homeId,
-	uint8 const _nodeId
+		uint32 const _homeId,
+		uint8 const _nodeId
 ):
-	CommandClass( _homeId, _nodeId ),
-	m_numEndPoints( 0 ),
-	m_numEndPointsHint( 0 ),
-	m_endPointMap( MultiInstanceMapAll ),
-	m_endPointFindSupported( false )
+CommandClass( _homeId, _nodeId ),
+m_numEndPoints( 0 ),
+m_numEndPointsHint( 0 ),
+m_endPointMap( MultiInstanceMapAll ),
+m_endPointFindSupported( false )
 {
 }
 
@@ -100,7 +101,7 @@ MultiInstance::MultiInstance
 //-----------------------------------------------------------------------------
 void MultiInstance::ReadXML
 (
-	TiXmlElement const* _ccElement
+		TiXmlElement const* _ccElement
 )
 {
 	int32 intVal;
@@ -148,7 +149,7 @@ void MultiInstance::ReadXML
 //-----------------------------------------------------------------------------
 void MultiInstance::WriteXML
 (
-	TiXmlElement* _ccElement
+		TiXmlElement* _ccElement
 )
 {
 	char str[32];
@@ -186,7 +187,6 @@ bool MultiInstance::RequestInstances
 		if( Node* node = GetNodeUnsafe() )
 		{
 			// MULTI_INSTANCE
-			char str[128];
 			for( map<uint8,CommandClass*>::const_iterator it = node->m_commandClassMap.begin(); it != node->m_commandClassMap.end(); ++it )
 			{
 				CommandClass* cc = it->second;
@@ -194,11 +194,11 @@ bool MultiInstance::RequestInstances
 				{
 					continue;
 				}
- 				if( cc->HasStaticRequest( StaticRequest_Instances ) )
+				if( cc->HasStaticRequest( StaticRequest_Instances ) )
 				{
-					snprintf( str, sizeof( str ), "MultiInstanceCmd_Get for %s", cc->GetCommandClassName().c_str() );
+					Log::Write( LogLevel_Info, GetNodeId(), "MultiInstanceCmd_Get for %s", cc->GetCommandClassName().c_str() );
 
-					Msg* msg = new Msg( str, GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
+					Msg* msg = new Msg( "MultiInstanceCmd_Get", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
 					msg->Append( GetNodeId() );
 					msg->Append( 3 );
 					msg->Append( GetCommandClassId() );
@@ -214,10 +214,10 @@ bool MultiInstance::RequestInstances
 	else
 	{
 		// MULTI_CHANNEL
-		char str[128];
-		snprintf( str, sizeof( str ), "MultiChannelCmd_EndPointGet for node %d", GetNodeId() );
 
-		Msg* msg = new Msg( str, GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
+		Log::Write( LogLevel_Info, GetNodeId(), "MultiChannelCmd_EndPointGet for node %d", GetNodeId() );
+
+		Msg* msg = new Msg( "MultiChannelCmd_EndPointGet", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
 		msg->Append( GetNodeId() );
 		msg->Append( 2 );
 		msg->Append( GetCommandClassId() );
@@ -236,9 +236,9 @@ bool MultiInstance::RequestInstances
 //-----------------------------------------------------------------------------
 bool MultiInstance::HandleMsg
 (
-	uint8 const* _data,
-	uint32 const _length,
-	uint32 const _instance	// = 1
+		uint8 const* _data,
+		uint32 const _length,
+		uint32 const _instance	// = 1
 )
 {
 	bool handled = false;
@@ -295,8 +295,8 @@ bool MultiInstance::HandleMsg
 //-----------------------------------------------------------------------------
 void MultiInstance::HandleMultiInstanceReport
 (
-	uint8 const* _data,
-	uint32 const _length
+		uint8 const* _data,
+		uint32 const _length
 )
 {
 	if( Node* node = GetNodeUnsafe() )
@@ -319,8 +319,8 @@ void MultiInstance::HandleMultiInstanceReport
 //-----------------------------------------------------------------------------
 void MultiInstance::HandleMultiInstanceEncap
 (
-	uint8 const* _data,
-	uint32 const _length
+		uint8 const* _data,
+		uint32 const _length
 )
 {
 	if( Node* node = GetNodeUnsafe() )
@@ -335,6 +335,7 @@ void MultiInstance::HandleMultiInstanceEncap
 		if( CommandClass* pCommandClass = node->GetCommandClass( commandClassId ) )
 		{
 			Log::Write( LogLevel_Info, GetNodeId(), "Received a MultiInstanceEncap from node %d, instance %d, for Command Class %s", GetNodeId(), instance, pCommandClass->GetCommandClassName().c_str() );
+			pCommandClass->ReceivedCntIncr();
 			pCommandClass->HandleMsg( &_data[3], _length-3, instance );
 		}
 	}
@@ -346,8 +347,8 @@ void MultiInstance::HandleMultiInstanceEncap
 //-----------------------------------------------------------------------------
 void MultiInstance::HandleMultiChannelEndPointReport
 (
-	uint8 const* _data,
-	uint32 const _length
+		uint8 const* _data,
+		uint32 const _length
 )
 {
 	int len;
@@ -382,9 +383,8 @@ void MultiInstance::HandleMultiChannelEndPointReport
 	{
 
 		// Send a single capability request to each endpoint
-		char str[128];
-		snprintf( str, sizeof( str ), "MultiChannelCmd_CapabilityGet for endpoint %d", i );
-		Msg* msg = new Msg( str, GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
+		Log::Write( LogLevel_Info, GetNodeId(), "MultiChannelCmd_CapabilityGet for endpoint %d", i );
+		Msg* msg = new Msg( "MultiChannelCmd_CapabilityGet", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
 		msg->Append( GetNodeId() );
 		msg->Append( 3 );
 		msg->Append( GetCommandClassId() );
@@ -401,8 +401,8 @@ void MultiInstance::HandleMultiChannelEndPointReport
 //-----------------------------------------------------------------------------
 void MultiInstance::HandleMultiChannelCapabilityReport
 (
-	uint8 const* _data,
-	uint32 const _length
+		uint8 const* _data,
+		uint32 const _length
 )
 {
 
@@ -415,11 +415,11 @@ void MultiInstance::HandleMultiChannelCapabilityReport
 		 * updating the commandclasses, see this email thread:
 		 * https://groups.google.com/d/topic/openzwave/IwepxScRAVo/discussion
 		 */
-	    if ((m_ignoreUnsolicitedMultiChannelCapabilityReport && (node->GetCurrentQueryStage() != Node::QueryStage_Instances))
-	    		&& !dynamic && m_endPointCommandClasses.size() > 0) {
+		if ((m_ignoreUnsolicitedMultiChannelCapabilityReport && (node->GetCurrentQueryStage() != Node::QueryStage_Instances))
+				&& !dynamic && m_endPointCommandClasses.size() > 0) {
 			Log::Write(LogLevel_Error, GetNodeId(), "Recieved a Unsolicited MultiChannelEncap when we are not in QueryState_Instances");
-	    	return;
-	    }
+			return;
+		}
 
 		uint8 endPoint = _data[1] & 0x7f;
 
@@ -456,7 +456,7 @@ void MultiInstance::HandleMultiChannelCapabilityReport
 			{
 				Log::Write( LogLevel_Info, GetNodeId(), "        %s", cc->GetCommandClassName().c_str() );
 			}
- 		}
+		}
 
 		// Create internal library instances for each command class in the list
 		// Also set up mapping from intances to endpoints for encapsulation
@@ -558,8 +558,8 @@ void MultiInstance::HandleMultiChannelCapabilityReport
 //-----------------------------------------------------------------------------
 void MultiInstance::HandleMultiChannelEndPointFindReport
 (
-	uint8 const* _data,
-	uint32 const _length
+		uint8 const* _data,
+		uint32 const _length
 )
 {
 	Log::Write( LogLevel_Info, GetNodeId(), "Received MultiChannelEndPointFindReport from node %d", GetNodeId() );
@@ -588,9 +588,8 @@ void MultiInstance::HandleMultiChannelEndPointFindReport
 		else
 		{
 			// Endpoints are different, so request the capabilities
-			char str[128];
-			snprintf( str, 128, "MultiChannelCmd_CapabilityGet for node %d, endpoint %d", GetNodeId(), endPoint );
-			Msg* msg = new Msg( str, GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
+			Log::Write(LogLevel_Info, GetNodeId(), "MultiChannelCmd_CapabilityGet for node %d, endpoint %d", GetNodeId(), endPoint );
+			Msg* msg = new Msg( "MultiChannelCmd_CapabilityGet", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
 			msg->Append( GetNodeId() );
 			msg->Append( 3 );
 			msg->Append( GetCommandClassId() );
@@ -611,19 +610,29 @@ void MultiInstance::HandleMultiChannelEndPointFindReport
 			{
 				// We have not yet found all the endpoints, so move to the next generic class request
 				++m_endPointFindIndex;
-				if( c_genericClass[m_endPointFindIndex] > 0 )
+				if (m_endPointFindIndex <= 13) /* we are finished */
 				{
-					char str[128];
-					snprintf( str, 128, "MultiChannelCmd_EndPointFind for generic device class 0x%.2x (%s)", c_genericClass[m_endPointFindIndex], c_genericClassName[m_endPointFindIndex] );
-					Msg* msg = new Msg( str, GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
-					msg->Append( GetNodeId() );
-					msg->Append( 4 );
-					msg->Append( GetCommandClassId() );
-					msg->Append( MultiChannelCmd_EndPointFind );
-					msg->Append( c_genericClass[m_endPointFindIndex] );		// Generic device class
-					msg->Append( 0xff );									// Any specific device class
-					msg->Append( GetDriver()->GetTransmitOptions() );
-					GetDriver()->SendMsg( msg, Driver::MsgQueue_Send );
+					if( c_genericClass[m_endPointFindIndex] > 0 )
+					{
+						if (m_endPointFindIndex > 13) /* size of c_genericClassName minus Unknown Entry */
+						{
+							Log::Write (LogLevel_Warning, GetNodeId(), "m_endPointFindIndex Value was greater than range. Setting to Unknown");
+							m_endPointFindIndex = 14;
+						}
+
+						Log::Write(LogLevel_Info, GetNodeId(), "MultiChannelCmd_EndPointFind for generic device class 0x%.2x (%s)", c_genericClass[m_endPointFindIndex], c_genericClassName[m_endPointFindIndex] );
+						Msg* msg = new Msg( "MultiChannelCmd_EndPointFind", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true, true, FUNC_ID_APPLICATION_COMMAND_HANDLER, GetCommandClassId() );
+						msg->Append( GetNodeId() );
+						msg->Append( 4 );
+						msg->Append( GetCommandClassId() );
+						msg->Append( MultiChannelCmd_EndPointFind );
+						msg->Append( c_genericClass[m_endPointFindIndex] );		// Generic device class
+						msg->Append( 0xff );									// Any specific device class
+						msg->Append( GetDriver()->GetTransmitOptions() );
+						GetDriver()->SendMsg( msg, Driver::MsgQueue_Send );
+					}
+				} else {
+					Log::Write (LogLevel_Warning, GetNodeId(), "m_endPointFindIndex is higher than range. Not Sending MultiChannelCmd_EndPointFind message");
 				}
 			}
 		}
@@ -636,28 +645,28 @@ void MultiInstance::HandleMultiChannelEndPointFindReport
 //-----------------------------------------------------------------------------
 void MultiInstance::HandleMultiChannelEncap
 (
-	uint8 const* _data,
-	uint32 const _length
+		uint8 const* _data,
+		uint32 const _length
 )
 {
 	if( Node* node = GetNodeUnsafe() )
 	{
-			uint8 endPoint = _data[1] & 0x7f;
-			uint8 commandClassId = _data[3];
-			if( CommandClass* pCommandClass = node->GetCommandClass( commandClassId ) )
+		uint8 endPoint = _data[1] & 0x7f;
+		uint8 commandClassId = _data[3];
+		if( CommandClass* pCommandClass = node->GetCommandClass( commandClassId ) )
+		{
+			uint8 instance = pCommandClass->GetInstance( endPoint );
+			if( instance == 0 )
 			{
-				uint8 instance = pCommandClass->GetInstance( endPoint );
-				if( instance == 0 )
-				{
-					Log::Write( LogLevel_Error, GetNodeId(), "Cannot find endpoint map to instance for Command Class %s endpoint %d", pCommandClass->GetCommandClassName().c_str(), endPoint );
-				}
-				else
-				{
-					Log::Write( LogLevel_Info, GetNodeId(), "Received a MultiChannelEncap from node %d, endpoint %d for Command Class %s", GetNodeId(), endPoint, pCommandClass->GetCommandClassName().c_str() );
-					pCommandClass->HandleMsg( &_data[4], _length-4, instance );
-				}
-			} else {
-				Log::Write(LogLevel_Error, GetNodeId(), "Recieved a MultiChannelEncap for endpoint %d for Command Class %d, which we can't find", endPoint, commandClassId);
+				Log::Write( LogLevel_Error, GetNodeId(), "Cannot find endpoint map to instance for Command Class %s endpoint %d", pCommandClass->GetCommandClassName().c_str(), endPoint );
 			}
+			else
+			{
+				Log::Write( LogLevel_Info, GetNodeId(), "Received a MultiChannelEncap from node %d, endpoint %d for Command Class %s", GetNodeId(), endPoint, pCommandClass->GetCommandClassName().c_str() );
+				pCommandClass->HandleMsg( &_data[4], _length-4, instance );
+			}
+		} else {
+			Log::Write(LogLevel_Error, GetNodeId(), "Recieved a MultiChannelEncap for endpoint %d for Command Class %d, which we can't find", endPoint, commandClassId);
+		}
 	}
 }

@@ -25,16 +25,16 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "Clock.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/Clock.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueByte.h"
-#include "ValueList.h"
+#include "value_classes/ValueByte.h"
+#include "value_classes/ValueList.h"
 
 using namespace OpenZWave;
 
@@ -128,6 +128,12 @@ bool Clock::HandleMsg
 		uint8 day = _data[1] >> 5;
 		uint8 hour = _data[1] & 0x1f;
 		uint8 minute = _data[2];
+
+		if (day > 7) /* size of c_dayNames */
+		{
+			Log::Write (LogLevel_Warning, GetNodeId(), "Day Value was greater than range. Setting to Invalid");
+			day = 0;
+		}
 
 		Log::Write( LogLevel_Info, GetNodeId(), "Received Clock report: %s %.2d:%.2d", c_dayNames[day], hour, minute );
 

@@ -26,15 +26,17 @@
 //-----------------------------------------------------------------------------
 
 #include <string>
-#include "CommandClasses.h"
-#include "ThermostatFanMode.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/ThermostatFanMode.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueList.h"
+#include "value_classes/ValueList.h"
+
+#include "tinyxml.h"
 
 using namespace OpenZWave;
 
@@ -55,7 +57,8 @@ static string const c_modeName[] =
 	"On High",
 	"Unknown 4",
 	"Unknown 5",
-	"Circulate"
+	"Circulate",
+	"Unknown"
 };
 
 //-----------------------------------------------------------------------------
@@ -85,6 +88,11 @@ void ThermostatFanMode::ReadXML
 					int index;
 					if( TIXML_SUCCESS == modeElement->QueryIntAttribute( "index", &index ) )
 					{
+						if (index > 6) /* size of c_modeName excluding Invalid */
+						{
+							Log::Write (LogLevel_Warning, GetNodeId(), "index Value in XML was greater than range. Setting to Invalid");
+							index = 7;
+						}
 						ValueList::Item item;
 						item.m_value = index;
 						item.m_label = c_modeName[index];
@@ -261,7 +269,8 @@ bool ThermostatFanMode::HandleMsg
 					ValueList::Item item;
 					item.m_value = (int32)((i-1)<<3) + bit;
 
-					if ((size_t)item.m_value >= sizeof(c_modeName)/sizeof(*c_modeName))
+					/* Minus 1 here as the Unknown Entry is our addition */
+					if ((size_t)item.m_value >= (sizeof(c_modeName)/sizeof(*c_modeName) -1))
 					{
 						Log::Write( LogLevel_Info, GetNodeId(), "Received unknown fan mode: 0x%x", item.m_value);
 					}

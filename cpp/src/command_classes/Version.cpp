@@ -25,15 +25,17 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "Version.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/Version.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Driver.h"
 #include "Node.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueString.h"
+#include "value_classes/ValueString.h"
+
+#include "tinyxml.h"
 
 using namespace OpenZWave;
 

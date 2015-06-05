@@ -25,18 +25,18 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "SwitchMultilevel.h"
-#include "WakeUp.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/SwitchMultilevel.h"
+#include "command_classes/WakeUp.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Driver.h"
 #include "Node.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueBool.h"
-#include "ValueButton.h"
-#include "ValueByte.h"
+#include "value_classes/ValueBool.h"
+#include "value_classes/ValueButton.h"
+#include "value_classes/ValueByte.h"
 
 using namespace OpenZWave;
 
@@ -182,8 +182,21 @@ bool SwitchMultilevel::HandleMsg
 	{
 		uint8 switchType1 = _data[1] & 0x1f;
 		uint8 switchType2 = _data[2] & 0x1f;
+		uint8 switchtype1label = switchType1;
+		uint8 switchtype2label = switchType2;
+		if (switchtype1label > 7) /* size of c_switchLabelsPos, c_switchLabelsNeg */
+		{
+			Log::Write (LogLevel_Warning, GetNodeId(), "switchtype1label Value was greater than range. Setting to Invalid");
+			switchtype1label = 0;
+		}
+		if (switchtype2label > 7) /* sizeof c_switchLabelsPos, c_switchLabelsNeg */
+		{
+			Log::Write (LogLevel_Warning, GetNodeId(), "switchtype2label Value was greater than range. Setting to Invalid");
+			switchtype2label = 0;
+		}
 
-		Log::Write( LogLevel_Info, GetNodeId(), "Received SwitchMultiLevel supported report: Switch1=%s/%s, Switch2=%s/%s", c_switchLabelsPos[switchType1], c_switchLabelsNeg[switchType1], c_switchLabelsPos[switchType2], c_switchLabelsNeg[switchType2] );
+
+		Log::Write( LogLevel_Info, GetNodeId(), "Received SwitchMultiLevel supported report: Switch1=%s/%s, Switch2=%s/%s", c_switchLabelsPos[switchtype1label], c_switchLabelsNeg[switchtype1label], c_switchLabelsPos[switchtype2label], c_switchLabelsNeg[switchtype2label] );
 		ClearStaticRequest( StaticRequest_Version );
 
 		// Set the labels on the values
@@ -193,12 +206,12 @@ bool SwitchMultilevel::HandleMsg
 		{
 			if( NULL != ( button = static_cast<ValueButton*>( GetValue( _instance, SwitchMultilevelIndex_Bright ) ) ) )
 			{
-				button->SetLabel( c_switchLabelsPos[switchType1] );
+				button->SetLabel( c_switchLabelsPos[switchtype1label] );
 				button->Release();
 			}
 			if( NULL != ( button = static_cast<ValueButton*>( GetValue( _instance, SwitchMultilevelIndex_Dim ) ) ) )
 			{
-				button->SetLabel( c_switchLabelsNeg[switchType1] );
+				button->SetLabel( c_switchLabelsNeg[switchtype1label] );
 				button->Release();
 			}
 		}
@@ -207,12 +220,12 @@ bool SwitchMultilevel::HandleMsg
 		{
 			if( NULL != ( button = static_cast<ValueButton*>( GetValue( _instance, SwitchMultilevelIndex_Inc ) ) ) )
 			{
-				button->SetLabel( c_switchLabelsPos[switchType2] );
+				button->SetLabel( c_switchLabelsPos[switchtype2label] );
 				button->Release();
 			}
 			if( NULL != ( button = static_cast<ValueButton*>( GetValue( _instance, SwitchMultilevelIndex_Dec ) ) ) )
 			{
-				button->SetLabel( c_switchLabelsNeg[switchType2] );
+				button->SetLabel( c_switchLabelsNeg[switchtype2label] );
 				button->Release();
 			}
 		}
@@ -430,7 +443,7 @@ bool SwitchMultilevel::SetLevel
 )
 {
 	Log::Write( LogLevel_Info, GetNodeId(), "SwitchMultilevel::Set - Setting to level %d", _level );
-	Msg* msg = new Msg( "SwitchMultiLevel Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+	Msg* msg = new Msg( "SwitchMultilevelCmd_Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 	msg->SetInstance( this, _instance );
 	msg->Append( GetNodeId() );
 
@@ -483,6 +496,11 @@ bool SwitchMultilevel::StartLevelChange
 	Log::Write( LogLevel_Info, GetNodeId(), "SwitchMultilevel::StartLevelChange - Starting a level change" );
 
 	uint8 length = 4;
+	if (_direction > 3) /* size of  c_directionParams, c_directionDebugLabels */
+	{
+		Log::Write (LogLevel_Warning, GetNodeId(), "_direction Value was greater than range. Dropping");
+		return false;
+	}
 	uint8 direction = c_directionParams[_direction];
 	Log::Write( LogLevel_Info, GetNodeId(), "  Direction:          %s", c_directionDebugLabels[_direction] );
 
@@ -526,7 +544,7 @@ bool SwitchMultilevel::StartLevelChange
 		}
 	}
 
-	Msg* msg = new Msg( "SwitchMultilevel StartLevelChange", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+	Msg* msg = new Msg( "SwitchMultilevelCmd_StartLevelChange", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 	msg->SetInstance( this, _instance );
 	msg->Append( GetNodeId() );
 	msg->Append( length );
@@ -560,7 +578,7 @@ bool SwitchMultilevel::StopLevelChange
 )
 {
 	Log::Write( LogLevel_Info, GetNodeId(), "SwitchMultilevel::StopLevelChange - Stopping the level change" );
-	Msg* msg = new Msg( "SwitchMultilevel StopLevelChange", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+	Msg* msg = new Msg( "SwitchMultilevelCmd_StopLevelChange", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 	msg->SetInstance( this, _instance );
 	msg->Append( GetNodeId() );
 	msg->Append( 2 );

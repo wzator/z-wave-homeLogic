@@ -29,7 +29,7 @@
 #define _Notification_H
 
 #include "Defs.h"
-#include "ValueID.h"
+#include "value_classes/ValueID.h"
 
 namespace OpenZWave
 {
@@ -55,13 +55,14 @@ namespace OpenZWave
 		friend class WakeUp;
 
 	public:
-		/** 
+		/**
 		 * Notification types.
 		 * Notifications of various Z-Wave events sent to the watchers
 		 * registered with the Manager::AddWatcher method.
 		 * \see Manager::AddWatcher
+		 * \see Manager::BeginControllerCommand
 	     */
-		enum NotificationType 
+		enum NotificationType
 		{
 			Type_ValueAdded = 0,					/**< A new node value has been added to OpenZWave's list. These notifications occur after a node has been discovered, and details of its command classes have been received.  Each command class may generate one or more values depending on the complexity of the item being represented.  */
 			Type_ValueRemoved,					/**< A node value has been removed from OpenZWave's list.  This only occurs when a node is removed. */
@@ -89,10 +90,13 @@ namespace OpenZWave
 			Type_AwakeNodesQueried,					/**< All awake nodes have been queried, so client application can expected complete data for these nodes. */
 			Type_AllNodesQueriedSomeDead,				/**< All nodes have been queried but some dead nodes found. */
 			Type_AllNodesQueried,					/**< All nodes have been queried, so client application can expected complete data. */
-			Type_Notification					/**< An error has occured that we need to report. */
+			Type_Notification,					/**< An error has occured that we need to report. */
+			Type_DriverRemoved,					/**< The Driver is being removed. (either due to Error or by request) Do Not Call Any Driver Related Methods after recieving this call */
+			Type_ControllerCommand				/**< When Controller Commands are executed, Notifications of Success/Failure etc are communicated via this Notification
+												  * Notification::GetEvent returns Driver::ControllerCommand and Notification::GetNotification returns Driver::ControllerState */
 		};
 
-		/** 
+		/**
 		 * Notification codes.
 		 * Notifications of the type Type_Notification convey some
 		 * extra information defined here.
@@ -108,84 +112,92 @@ namespace OpenZWave
 			Code_Alive						/**< Report when a node is revived */
 		};
 
-		/** 
+		/**
 		 * Get the type of this notification.
 		 * \return the notification type.
 		 * \see NotificationType
 	     */
 		NotificationType GetType()const{ return m_type; }
 
-		/** 
+		/**
 		 * Get the Home ID of the driver sending this notification.
 		 * \return the driver Home ID
 	     */
 		uint32 GetHomeId()const{ return m_valueId.GetHomeId(); }
 
-		/** 
+		/**
 		 * Get the ID of any node involved in this notification.
 		 * \return the node's ID
 	     */
 		uint8 GetNodeId()const{ return m_valueId.GetNodeId(); }
-		
-		/** 
+
+		/**
 		 * Get the unique ValueID of any value involved in this notification.
 		 * \return the value's ValueID
 		 */
 		ValueID const& GetValueID()const{ return m_valueId; }
-		
-		/** 
-		 * Get the index of the association group that has been changed.  Only valid in NotificationType::Type_Group notifications. 
-		 * \return the group index.
-		 */
-		uint8 GetGroupIdx()const{ assert(Type_Group==m_type); return m_byte; } 
-
-		/** 
-		 * Get the event value of a notification.  Only valid in NotificationType::Type_NodeEvent notifications. 
-		 * \return the event value.
-		 */
-		uint8 GetEvent()const{ assert(Type_NodeEvent==m_type); return m_byte; } 
-
-		/** 
-		 * Get the button id of a notification.  Only valid in NotificationType::Type_CreateButton, DeleteButton,
-		 * ButtonOn and ButtonOff notifications. 
-		 * \return the button id.
-		 */
-		uint8 GetButtonId()const{ assert(Type_CreateButton==m_type || Type_DeleteButton==m_type || Type_ButtonOn==m_type || Type_ButtonOff==m_type); return m_byte; } 
-
-		/** 
-		 * Get the scene Id of a notification.  Only valid in NotificationType::Type_SceneEvent notifications. 
-		 * \return the event value.
-		 */
-		uint8 GetSceneId()const{ assert(Type_SceneEvent==m_type); return m_byte; } 
 
 		/**
-		 * Get the notification code from a notification. Only valid for NotificationType::Type_Notification notifications.
+		 * Get the index of the association group that has been changed.  Only valid in Notification::Type_Group notifications.
+		 * \return the group index.
+		 */
+		uint8 GetGroupIdx()const{ assert(Type_Group==m_type); return m_byte; }
+
+		/**
+		 * Get the event value of a notification.  Only valid in Notification::Type_NodeEvent and Notification::Type_ControllerCommand notifications.
+		 * \return the event value.
+		 */
+		uint8 GetEvent()const{ assert((Type_NodeEvent==m_type) || (Type_ControllerCommand == m_type)); return m_event; }
+
+		/**
+		 * Get the button id of a notification.  Only valid in Notification::Type_CreateButton, Notification::Type_DeleteButton,
+		 * Notification::Type_ButtonOn and Notification::Type_ButtonOff notifications.
+		 * \return the button id.
+		 */
+		uint8 GetButtonId()const{ assert(Type_CreateButton==m_type || Type_DeleteButton==m_type || Type_ButtonOn==m_type || Type_ButtonOff==m_type); return m_byte; }
+
+		/**
+		 * Get the scene Id of a notification.  Only valid in Notification::Type_SceneEvent notifications.
+		 * \return the event value.
+		 */
+		uint8 GetSceneId()const{ assert(Type_SceneEvent==m_type); return m_byte; }
+
+		/**
+		 * Get the notification code from a notification. Only valid for Notification::Type_Notification or Notification::Type_ControllerCommand notifications.
 		 * \return the notification code.
 		 */
-		uint8 GetNotification()const{ assert(Type_Notification==m_type); return m_byte; }
+		uint8 GetNotification()const{ assert((Type_Notification==m_type) || (Type_ControllerCommand == m_type)); return m_byte; }
 
-		/** 
+		/**
 		 * Helper function to simplify wrapping the notification class.  Should not normally need to be called.
 		 * \return the internal byte value of the notification.
 		 */
-		uint8 GetByte()const{ return m_byte; } 
+		uint8 GetByte()const{ return m_byte; }
+
+		/**
+		 * Helper Function to return the Notification as a String
+		 * \return A string representation of this Notification
+		 */
+		string GetAsString();
+
 
 	private:
-		Notification( NotificationType _type ): m_type( _type ), m_byte(0){}
+		Notification( NotificationType _type ): m_type( _type ), m_byte(0), m_event(0) {}
 		~Notification(){}
 
 		void SetHomeAndNodeIds( uint32 const _homeId, uint8 const _nodeId ){ m_valueId = ValueID( _homeId, _nodeId ); }
 		void SetHomeNodeIdAndInstance ( uint32 const _homeId, uint8 const _nodeId, uint32 const _instance ){ m_valueId = ValueID( _homeId, _nodeId, _instance ); }
 		void SetValueId( ValueID const& _valueId ){ m_valueId = _valueId; }
 		void SetGroupIdx( uint8 const _groupIdx ){ assert(Type_Group==m_type); m_byte = _groupIdx; }
-		void SetEvent( uint8 const _event ){ assert(Type_NodeEvent==m_type); m_byte = _event; }
+		void SetEvent( uint8 const _event ){ assert(Type_NodeEvent==m_type || Type_ControllerCommand == m_type); m_event = _event; }
 		void SetSceneId( uint8 const _sceneId ){ assert(Type_SceneEvent==m_type); m_byte = _sceneId; }
 		void SetButtonId( uint8 const _buttonId ){ assert(Type_CreateButton==m_type||Type_DeleteButton==m_type||Type_ButtonOn==m_type||Type_ButtonOff==m_type); m_byte = _buttonId; }
-		void SetNotification( uint8 const _noteId ){ assert(Type_Notification==m_type); m_byte = _noteId; }
+		void SetNotification( uint8 const _noteId ){ assert((Type_Notification==m_type) || (Type_ControllerCommand == m_type)); m_byte = _noteId; }
 
 		NotificationType		m_type;
 		ValueID				m_valueId;
 		uint8				m_byte;
+		uint8				m_event;
 	};
 
 } //namespace OpenZWave

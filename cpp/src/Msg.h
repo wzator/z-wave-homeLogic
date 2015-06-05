@@ -32,10 +32,12 @@
 #include <string>
 #include <string.h>
 #include "Defs.h"
+//#include "Driver.h"
 
 namespace OpenZWave
 {
 	class CommandClass;
+	class Driver;
 
 	/** \brief Message object to be passed to and from devices on the Z-Wave network.
 	 */
@@ -56,7 +58,7 @@ namespace OpenZWave
 		void Append( uint8 const _data );
 		void Finalize();
 		void UpdateCallbackId();
-	
+
 		/**
 		 * \brief Identifies the Node ID of the "target" node (if any) for this function.
 		 * \return Node ID of the target.
@@ -81,28 +83,32 @@ namespace OpenZWave
 		uint8 GetExpectedReply()const{ return m_expectedReply; }
 
 		/**
-		 * \brief Identifies the expected Command Class ID (if any) for this message. 
+		 * \brief Identifies the expected Command Class ID (if any) for this message.
 		 * \return Expected command class ID for this message.
 		 */
 		uint8 GetExpectedCommandClassId()const{ return m_expectedCommandClassId; }
 
 		/**
 		 * \brief For messages that request a Report for a specified command class, identifies the expected Instance
-		 * for the variable being obtained in the report. 
+		 * for the variable being obtained in the report.
 		 * \return Expected Instance value for this message.
 		 */
 		uint8 GetExpectedInstance()const{ return m_instance; }
 
 		/**
 		 * \brief For messages that request a Report for a specified command class, identifies the expected Index
-		 * for the variable being obtained in the report. 
+		 * for the variable being obtained in the report.
 		 * \return Expected Index value for this message.
 		 */
 //		uint8 GetExpectedIndex()const{ return m_expectedIndex; }
+		/**
+		 * \brief get the LogText Associated with this message
+		 * \return the LogText used during the constructor
+		 */
+		string GetLogText()const{ return m_logText; }
 
-
-		uint32 GetLength()const{ return m_length; }
-		uint8* GetBuffer(){ return m_buffer; }
+		uint32 GetLength()const{ return m_encrypted == true ? m_length + 20 + 6 : m_length; }
+		uint8* GetBuffer();
 		string GetAsString();
 
 		uint8 GetSendAttempts()const{ return m_sendAttempts; }
@@ -121,18 +127,51 @@ namespace OpenZWave
 		}
 
 		bool operator == ( Msg const& _other )const
-		{ 
+		{
 			if( m_bFinal && _other.m_bFinal )
 			{
 				// Do not include the callback Id or checksum in the comparison.
 				uint8 length = m_length - (m_bCallbackRequired ? 2: 1 );
-				return( !memcmp( m_buffer, _other.m_buffer, length ) ); 
+				return( !memcmp( m_buffer, _other.m_buffer, length ) );
 			}
 
 			return false;
 		}
+		uint8 GetSendingCommandClass() {
+			if (m_buffer[3] == 0x13) {
+				return m_buffer[6];
+			}
+			return 0;
 
+		}
+
+		bool isEncrypted() {
+			return m_encrypted;
+		}
+		void setEncrypted() {
+			m_encrypted = true;
+		}
+		bool isNonceRecieved() {
+			return m_noncerecvd;
+		}
+		void setNonce(uint8 nonce[8]) {
+			memcpy(m_nonce, nonce, 8);
+			m_noncerecvd = true;
+			UpdateCallbackId();
+		}
+		void clearNonce() {
+			memset((m_nonce), '\0', 8);
+			m_noncerecvd = false;
+		}
+		void SetHomeId(uint32 homeId) { m_homeId = homeId; };
+
+		/** Returns a pointer to the driver (interface with a Z-Wave controller)
+		 *  associated with this node.
+		*/
+		Driver* GetDriver()const;
 	private:
+
+
 		void MultiEncap();					// Encapsulate the data inside a MultiInstance/Multicommand message
 
 		string			m_logText;
@@ -144,7 +183,8 @@ namespace OpenZWave
 		uint8			m_expectedCommandClassId;
 		uint8			m_length;
 		uint8			m_buffer[256];
-		
+		uint8			e_buffer[256];
+
 		uint8			m_targetNodeId;
 		uint8			m_sendAttempts;
 		uint8			m_maxSendAttempts;
@@ -153,6 +193,10 @@ namespace OpenZWave
 		uint8			m_endPoint;			// Endpoint to use if the message must be wrapped in a multiInstance or multiChannel command class
 		uint8			m_flags;
 
+		bool			m_encrypted;
+		bool			m_noncerecvd;
+		uint8			m_nonce[8];
+		uint32			m_homeId;
 		static uint8		s_nextCallbackId;		// counter to get a unique callback id
 	};
 

@@ -27,15 +27,15 @@
 
 #include <vector>
 
-#include "CommandClasses.h"
-#include "Protection.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/Protection.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueList.h"
+#include "value_classes/ValueList.h"
 
 using namespace OpenZWave;
 
@@ -50,7 +50,8 @@ static char const* c_protectionStateNames[] =
 {
 	"Unprotected",
 	"Protection by Sequence",
-	"No Operation Possible"
+	"No Operation Possible",
+	"Unknown"
 };
 
 //-----------------------------------------------------------------------------
@@ -114,6 +115,12 @@ bool Protection::HandleMsg
 {
 	if (ProtectionCmd_Report == (ProtectionCmd)_data[0])
 	{
+		int8 stateValue = _data[1];
+		if (stateValue > 2) /* size of c_protectionStateNames minus Invalid */
+		{
+			Log::Write (LogLevel_Warning, GetNodeId(), "State Value was greater than range. Setting to Invalid");
+			stateValue = 3;
+		}
 		Log::Write( LogLevel_Info, GetNodeId(), "Received a Protection report: %s", c_protectionStateNames[_data[1]] );
 		if( ValueList* value = static_cast<ValueList*>( GetValue( _instance, 0 ) ) )
 		{
@@ -142,7 +149,7 @@ bool Protection::SetValue
 		ValueList::Item const& item = value->GetItem();
 
 		Log::Write( LogLevel_Info, GetNodeId(), "Protection::Set - Setting protection state to '%s'", item.m_label.c_str() );
-		Msg* msg = new Msg( "Protection Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+		Msg* msg = new Msg( "ProtectionCmd_Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 		msg->SetInstance( this, _value.GetID().GetInstance() );
 		msg->Append( GetNodeId() );
 		msg->Append( 3 );

@@ -45,13 +45,24 @@
 #	endif
 // Disable export warnings
 #	define OPENZWAVE_EXPORT_WARNINGS_OFF	__pragma( warning(push) )\
-											__pragma( warning(disable: 4251) )
+											__pragma( warning(disable: 4251) ) \
+											__pragma( warning(disable: 4275) )
 #	define OPENZWAVE_EXPORT_WARNINGS_ON		__pragma( warning(pop) )
 #else
 #	define OPENZWAVE_EXPORT
 #	define OPENZWAVE_EXPORT_WARNINGS_OFF
 #	define OPENZWAVE_EXPORT_WARNINGS_ON
 #endif
+
+#ifdef __GNUC__
+#define DEPRECATED __attribute__((deprecated))
+#elif defined(_MSC_VER)
+#define DEPRECATED __declspec(deprecated)
+#else
+#pragma message("WARNING: You need to implement DEPRECATED for this compiler")
+#define DEPRECATED
+#endif
+
 
 #ifdef NULL
 #undef NULL
@@ -134,6 +145,28 @@ static inline int version_cmp(struct ozwversion a, struct ozwversion b)
 	return  (a._v == b._v) ? 0 : (a._v > b._v) ? 1 : - 1;
 }
 
+#include "OZWException.h"
+#define OPENZWAVE_DISABLE_EXCEPTIONS
+#if defined(_MSC_VER)
+#  define __MYFUNCTION__ __FUNCTION__
+#else
+#  define __MYFUNCTION__ __FILE__
+#endif
+// Exceptions : define OPENZWAVE_DISABLE_EXCEPTIONS in compiler flags to enable exceptions instead of exit function
+#ifndef OPENZWAVE_DISABLE_EXCEPTIONS
+
+#  define OZW_FATAL_ERROR(exitCode, msg)   	Log::Write( LogLevel_Error,"Exception: %s:%d - %d - %s", std::string(__MYFUNCTION__).substr(std::string(__MYFUNCTION__).find_last_of("/\\") + 1).c_str(), __LINE__, exitCode, msg); \
+											throw OZWException(__MYFUNCTION__, __LINE__, exitCode, msg)
+#  define OZW_ERROR(exitCode, msg) 			Log::Write( LogLevel_Warning,"Exception: %s:%d - %d - %s", std::string(__MYFUNCTION__).substr(std::string(__MYFUNCTION__).find_last_of("/\\") + 1).c_str(), __LINE__, exitCode, msg); \
+											throw OZWException(__MYFUNCTION__, __LINE__, exitCode, msg)
+
+#else
+
+#  define OZW_FATAL_ERROR(exitCode, msg)   	Log::Write( LogLevel_Error,"Exception: %s:%d - %d - %s", std::string(__MYFUNCTION__).substr(std::string(__MYFUNCTION__).find_last_of("/\\") + 1).c_str(), __LINE__, exitCode, msg); \
+											std::cerr << "Error: "<< std::string(__MYFUNCTION__).substr(std::string(__MYFUNCTION__).find_last_of("/\\") + 1) << ":" << __LINE__ << " - " << msg << std::endl; exit(exitCode)
+#  define OZW_ERROR(exitCode, msg)			Log::Write( LogLevel_Warning,"Exception: %s:%d - %d - %s", std::string(__MYFUNCTION__).substr(std::string(__MYFUNCTION__).find_last_of("/\\") + 1).c_str(), __LINE__, exitCode, msg);
+
+#endif
 
 // Declare the OpenZWave namespace
 namespace std {}
@@ -154,6 +187,7 @@ namespace OpenZWave
 // Rename safe versions of sprintf etc
 #define snprintf sprintf_s
 #define strcasecmp _stricmp
+#define sscanf sscanf_s
 
 #endif
 
@@ -163,7 +197,7 @@ namespace OpenZWave
 // Replace "safe" versions of sprintf
 #define sprintf_s snprintf
 
-// seems some MINGW versions don't have a errno_t 
+// seems some MINGW versions don't have a errno_t
 #ifndef errno_t
 #define errno_t int
 #endif
@@ -173,11 +207,13 @@ namespace OpenZWave
 
 #endif
 
-#define MAX_TRIES		3	// Retry sends up to 3 times
+//#define MAX_TRIES		3	// Retry sends up to 3 times
+#define MAX_TRIES		1	// set this to one, as I believe now that a ACK failure is indication that the device is offline, hence additional attempts will not work. 
 #define MAX_MAX_TRIES		7	// Don't exceed this retry limit
 #define ACK_TIMEOUT	1000		// How long to wait for an ACK
 #define BYTE_TIMEOUT	150
-#define RETRY_TIMEOUT	40000		// Retry send after 40 seconds
+//#define RETRY_TIMEOUT	40000		// Retry send after 40 seconds
+#define RETRY_TIMEOUT	10000		// Retry send after 10 seconds (we might need to keep this below 10 for Security CC to function correctly)
 
 #define SOF												0x01
 #define ACK												0x06

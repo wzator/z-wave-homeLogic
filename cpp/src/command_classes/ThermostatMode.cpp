@@ -25,15 +25,17 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "ThermostatMode.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/ThermostatMode.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueList.h"
+#include "value_classes/ValueList.h"
+
+#include "tinyxml.h"
 
 using namespace OpenZWave;
 
@@ -61,7 +63,8 @@ static char const* c_modeName[] =
 	"Auto Changeover",
 	"Heat Econ",
 	"Cool Econ",
-	"Away"
+	"Away",
+	"Unknown"
 };
 
 //-----------------------------------------------------------------------------
@@ -91,6 +94,11 @@ void ThermostatMode::ReadXML
 					int index;
 					if( TIXML_SUCCESS == modeElement->QueryIntAttribute( "index", &index ) )
 					{
+						if (index > 13) /* size of c_modeName minus Invalid */
+						{
+							Log::Write (LogLevel_Warning, GetNodeId(), "index Value in XML was greater than range. Setting to Invalid");
+							index = 14;
+						}
 						ValueList::Item item;
 						item.m_value = index;
 						item.m_label = c_modeName[index];
@@ -284,8 +292,8 @@ bool ThermostatMode::HandleMsg
 				{
 					ValueList::Item item;
 					item.m_value = (int32)((i-1)<<3) + bit;
-
-					if ((size_t)item.m_value >= sizeof(c_modeName)/sizeof(*c_modeName))
+					/* minus 1 in the sizeof calc here, as the Unknown entry is our addition */
+					if ((size_t)item.m_value >= (sizeof(c_modeName)/sizeof(*c_modeName) -1))
 					{
 						Log::Write( LogLevel_Info, GetNodeId(), "Received unknown thermostat mode: 0x%x", item.m_value);
 					}

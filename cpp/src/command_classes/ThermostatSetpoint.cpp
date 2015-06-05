@@ -25,15 +25,17 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "ThermostatSetpoint.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/ThermostatSetpoint.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueDecimal.h"
+#include "value_classes/ValueDecimal.h"
+
+#include "tinyxml.h"
 
 using namespace OpenZWave;
 
@@ -288,7 +290,7 @@ bool ThermostatSetpoint::SetValue
 		ValueDecimal const* value = static_cast<ValueDecimal const*>(&_value);
 		uint8 scale = strcmp( "C", value->GetUnits().c_str() ) ? 1 : 0;
 
-		Msg* msg = new Msg( "Set Thermostat Setpoint", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+		Msg* msg = new Msg( "ThermostatSetpointCmd_Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 		msg->SetInstance( this, _value.GetID().GetInstance() );
 		msg->Append( GetNodeId() );
 		msg->Append( 4 + GetAppendValueSize( value->GetValue() ) );

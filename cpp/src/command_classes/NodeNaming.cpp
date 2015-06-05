@@ -25,15 +25,15 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "NodeNaming.h"
-#include "Association.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/NodeNaming.h"
+#include "command_classes/Association.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
-#include "Log.h"
 #include "Notification.h"
+#include "platform/Log.h"
 
 using namespace OpenZWave;
 
@@ -336,14 +336,14 @@ void NodeNaming::SetName
 	string const& _name
 )
 {
-	uint32 length = _name.size();
+	size_t length = _name.size();
 	if( length > 16 )
 	{
 		length = 16;
 	}
 
 	Log::Write( LogLevel_Info, GetNodeId(), "NodeNaming::Set - Naming to '%s'", _name.c_str() );
-	Msg* msg = new Msg( "NodeNaming Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+	Msg* msg = new Msg( "NodeNamingCmd_Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 	msg->Append( GetNodeId() );
 	msg->Append( (uint8)(length + 3) );
 	msg->Append( GetCommandClassId() );
@@ -368,14 +368,14 @@ void NodeNaming::SetLocation
 	string const& _location
 )
 {
-	uint32 length = _location.size();
+	size_t length = _location.size();
 	if( length > 16 )
 	{
 		length = 16;
 	}
 
 	Log::Write( LogLevel_Info, GetNodeId(), "NodeNaming::SetLocation - Setting location to '%s'", _location.c_str() );
-	Msg* msg = new Msg( "NodeNaming Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+	Msg* msg = new Msg( "NodeNamingCmd_LocationSet", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 	msg->Append( GetNodeId() );
 	msg->Append( (uint8)(length + 3) );
 	msg->Append( GetCommandClassId() );

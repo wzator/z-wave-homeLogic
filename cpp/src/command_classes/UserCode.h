@@ -28,7 +28,7 @@
 #ifndef _UserCode_H
 #define _UserCode_H
 
-#include "CommandClass.h"
+#include "command_classes/CommandClass.h"
 
 namespace OpenZWave
 {
@@ -95,14 +95,15 @@ namespace OpenZWave
 				default:
 				{
 					return "Unknown";
-				}				
+				}
 			}
 		}
 
 		bool		m_queryAll;				// True while we are requesting all the user codes.
 		uint8		m_currentCode;
 		uint8		m_userCodeCount;
-		uint8		m_userCodesStatus[255];
+		uint8		m_userCodesStatus[256];
+		bool		m_refreshUserCodes;
 	};
 
 } // namespace OpenZWave

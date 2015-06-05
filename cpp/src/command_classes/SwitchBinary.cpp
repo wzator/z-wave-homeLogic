@@ -25,16 +25,16 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "SwitchBinary.h"
-#include "WakeUp.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/SwitchBinary.h"
+#include "command_classes/WakeUp.h"
 #include "Defs.h"
 #include "Msg.h"
 #include "Driver.h"
 #include "Node.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueBool.h"
+#include "value_classes/ValueBool.h"
 
 using namespace OpenZWave;
 
@@ -133,7 +133,7 @@ bool SwitchBinary::SetValue
 		ValueBool const* value = static_cast<ValueBool const*>(&_value);
 
 		Log::Write( LogLevel_Info, GetNodeId(), "SwitchBinary::Set - Setting node %d to %s", GetNodeId(), value->GetValue() ? "On" : "Off" );
-		Msg* msg = new Msg( "SwitchBinary Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
+		Msg* msg = new Msg( "SwitchBinaryCmd_Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 		msg->SetInstance( this, _value.GetID().GetInstance() );
 		msg->Append( GetNodeId() );
 		msg->Append( 3 );

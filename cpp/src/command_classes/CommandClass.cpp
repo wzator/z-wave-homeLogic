@@ -28,15 +28,16 @@
 #include <math.h>
 #include <locale.h>
 #include "tinyxml.h"
-#include "CommandClass.h"
-#include "Basic.h"
-#include "MultiInstance.h"
+#include "command_classes/CommandClass.h"
+#include "command_classes/Basic.h"
+#include "command_classes/MultiInstance.h"
+#include "command_classes/CommandClasses.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
 #include "Manager.h"
-#include "Log.h"
-#include "ValueStore.h"
+#include "platform/Log.h"
+#include "value_classes/ValueStore.h"
 
 using namespace OpenZWave;
 
@@ -52,19 +53,22 @@ static uint8 const	c_precisionShift	= 0x05;
 //-----------------------------------------------------------------------------
 CommandClass::CommandClass
 (
-	uint32 const _homeId,
-	uint8 const _nodeId
+		uint32 const _homeId,
+		uint8 const _nodeId
 ):
-	m_homeId( _homeId ),
-	m_nodeId( _nodeId ),
-	m_version( 1 ),
-	m_afterMark( false ),
-	m_createVars( true ),
-	m_overridePrecision( -1 ),
-	m_getSupported( true ),
-	m_staticRequests( 0 ),
-	m_sentCnt( 0 ),
-	m_receivedCnt( 0 )
+m_homeId( _homeId ),
+m_nodeId( _nodeId ),
+m_version( 1 ),
+m_afterMark( false ),
+m_createVars( true ),
+m_overridePrecision( -1 ),
+m_getSupported( true ),
+m_isSecured( false ),
+m_SecureSupport( true ),
+m_inNIF(false),
+m_staticRequests( 0 ),
+m_sentCnt( 0 ),
+m_receivedCnt( 0 )
 {
 }
 
@@ -81,6 +85,25 @@ CommandClass::~CommandClass
 		map<uint8,uint8>::iterator it = m_endPointMap.begin();
 		m_endPointMap.erase( it );
 	}
+	while ( !m_RefreshClassValues.empty() )
+	{
+		for (unsigned int i = 0; i < m_RefreshClassValues.size(); i++)
+		{
+			RefreshValue *rcc = m_RefreshClassValues.at(i);
+			while(!rcc->RefreshClasses.empty()) {
+				delete rcc->RefreshClasses.back();
+				rcc->RefreshClasses.pop_back();
+			}
+			//			for (unsigned int j = 0; j < rcc->RefreshClasses.size(); i++)
+			//			{
+			//				delete rcc->RefreshClasses[j];
+			//			}
+			rcc->RefreshClasses.clear();
+			delete rcc;
+		}
+		m_RefreshClassValues.clear();
+	}
+
 }
 
 //-----------------------------------------------------------------------------
@@ -111,8 +134,8 @@ Node* CommandClass::GetNodeUnsafe
 //-----------------------------------------------------------------------------
 Value* CommandClass::GetValue
 (
-	uint8 const _instance,
-	uint8 const _index
+		uint8 const _instance,
+		uint8 const _index
 )
 {
 	Value* value = NULL;
@@ -129,8 +152,8 @@ Value* CommandClass::GetValue
 //-----------------------------------------------------------------------------
 bool CommandClass::RemoveValue
 (
-	uint8 const _instance,
-	uint8 const _index
+		uint8 const _instance,
+		uint8 const _index
 )
 {
 	if( Node* node = GetNodeUnsafe() )
@@ -145,13 +168,13 @@ bool CommandClass::RemoveValue
 // Instances as set by the MultiInstance V1 command class
 //-----------------------------------------------------------------------------
 void CommandClass::SetInstances
-( 
-	uint8 const _instances
+(
+		uint8 const _instances
 )
 {
 	// Ensure we have a set of reported variables for each new instance
 	if( !m_afterMark )
-	{	
+	{
 		for( uint8 i=0; i<_instances; ++i )
 		{
 			SetInstance( i+1 );
@@ -164,8 +187,8 @@ void CommandClass::SetInstances
 // Instances as set by the MultiChannel (i.e. MultiInstance V2) command class
 //-----------------------------------------------------------------------------
 void CommandClass::SetInstance
-( 
-	uint8 const _endPoint
+(
+		uint8 const _endPoint
 )
 {
 	if( !m_instances.IsSet( _endPoint ) )
@@ -183,8 +206,8 @@ void CommandClass::SetInstance
 // Read the saved command class data
 //-----------------------------------------------------------------------------
 void CommandClass::ReadXML
-( 
-	TiXmlElement const* _ccElement
+(
+		TiXmlElement const* _ccElement
 )
 {
 	int32 intVal;
@@ -238,6 +261,18 @@ void CommandClass::ReadXML
 		m_getSupported = !strcmp( str, "true" );
 	}
 
+	str = _ccElement->Attribute( "issecured" );
+	if( str )
+	{
+		m_isSecured = !strcmp( str, "true" );
+	}
+	str = _ccElement->Attribute( "innif" );
+	if( str )
+	{
+		m_inNIF = !strcmp( str, "true" );
+	}
+
+
 	// Setting the instance count will create all the values.
 	SetInstances( instances );
 
@@ -269,6 +304,10 @@ void CommandClass::ReadXML
 				// Apply any differences from the saved XML to the value
 				GetNodeUnsafe()->ReadValueFromXML( GetCommandClassId(), child );
 			}
+			else if (!strcmp( str, "TriggerRefreshValue" ) )
+			{
+				ReadValueRefreshXML(child);
+			}
 		}
 
 		child = child->NextSiblingElement();
@@ -276,12 +315,122 @@ void CommandClass::ReadXML
 }
 
 //-----------------------------------------------------------------------------
+// <CommandClass::ReadValueRefreshXML>
+// Read the config that contains a list of Values that should be refreshed when
+// we recieve u updated Value from a device. (This helps Yale Door Locks, which send a
+// Alarm Report instead of DoorLock Report when the status of the Door Lock is changed
+//-----------------------------------------------------------------------------
+void CommandClass::ReadValueRefreshXML
+(
+		TiXmlElement const* _ccElement
+)
+{
+
+	char const* str;
+	bool ok = false;
+	const char *genre;
+	RefreshValue *rcc = new RefreshValue();
+	rcc->cc = GetCommandClassId();
+	genre = _ccElement->Attribute( "Genre" );
+	rcc->genre = Value::GetGenreEnumFromName(genre);
+	_ccElement->QueryIntAttribute( "Instance", (int*)&rcc->instance);
+	_ccElement->QueryIntAttribute( "Index", (int*)&rcc->index);
+	Log::Write(LogLevel_Info, GetNodeId(), "Value Refresh triggered by CommandClass: %s, Genre: %d, Instance: %d, Index: %d for:", GetCommandClassName().c_str(), rcc->genre, rcc->instance, rcc->index);
+	TiXmlElement const* child = _ccElement->FirstChildElement();
+	while( child )
+	{
+		str = child->Value();
+		if( str )
+		{
+			if ( !strcmp(str, "RefreshClassValue"))
+			{
+				RefreshValue *arcc = new RefreshValue();
+				if (child->QueryIntAttribute( "CommandClass", (int*)&arcc->cc) != TIXML_SUCCESS) {
+					Log::Write(LogLevel_Warning, GetNodeId(), "    Invalid XML - CommandClass Attribute is wrong type or missing");
+					continue;
+				}
+				if (child->QueryIntAttribute( "RequestFlags", (int*)&arcc->genre) != TIXML_SUCCESS) {
+					Log::Write(LogLevel_Warning, GetNodeId(), "    Invalid XML - RequestFlags Attribute is wrong type or missing");
+					continue;
+				}
+				if (child->QueryIntAttribute( "Instance", (int*)&arcc->instance) != TIXML_SUCCESS) {
+					Log::Write(LogLevel_Warning, GetNodeId(), "    Invalid XML - Instance Attribute is wrong type or missing");
+					continue;
+				}
+				if (child->QueryIntAttribute( "Index", (int*)&arcc->index) != TIXML_SUCCESS) {
+					Log::Write(LogLevel_Warning, GetNodeId(), "    Invalid XML - Index Attribute is wrong type or missing");
+					continue;
+				}
+				Log::Write(LogLevel_Info, GetNodeId(), "    CommandClass: %s, RequestFlags: %d, Instance: %d, Index: %d", CommandClasses::GetName(arcc->cc).c_str(), arcc->genre, arcc->instance, arcc->index);
+				rcc->RefreshClasses.push_back(arcc);
+				ok = true;
+			}
+			else
+			{
+				Log::Write(LogLevel_Warning, GetNodeId(), "Got Unhandled Child Entry in TriggerRefreshValue XML Config: %s", str);
+			}
+		}
+		child = child->NextSiblingElement();
+	}
+	if (ok == true) {
+		m_RefreshClassValues.push_back( rcc );
+	} else {
+		Log::Write(LogLevel_Warning, GetNodeId(), "Failed to add a RefreshClassValue from XML");
+		delete rcc;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// <CommandClass::CheckForRefreshValues>
+// Scan our m_RefreshClassValues vector to see if we should call any other
+// Command Classes to refresh their value
+//-----------------------------------------------------------------------------
+
+bool CommandClass::CheckForRefreshValues (
+		Value const* _value
+)
+{
+	if (m_RefreshClassValues.empty())
+	{
+		//Log::Write(LogLevel_Debug, GetNodeId(), "Bailing out of CheckForRefreshValues");
+		return false;
+	}
+	Node* node = GetNodeUnsafe();
+	if( node != NULL )
+	{
+		for (uint32 i = 0; i < m_RefreshClassValues.size(); i++)
+		{
+			RefreshValue *rcc = m_RefreshClassValues.at(i);
+			//Log::Write(LogLevel_Debug, GetNodeId(), "Checking Value Against RefreshClassList: CommandClass %s = %s, Genre %d = %d, Instance %d = %d, Index %d = %d", CommandClasses::GetName(rcc->cc).c_str(), CommandClasses::GetName(_value->GetID().GetCommandClassId()).c_str(), rcc->genre, _value->GetID().GetGenre(), rcc->instance, _value->GetID().GetInstance(), rcc->index, _value->GetID().GetIndex());
+			if ((rcc->genre == _value->GetID().GetGenre()) && (rcc->instance == _value->GetID().GetInstance()) && (rcc->index == _value->GetID().GetIndex()) )
+			{
+				/* we got a match..... */
+				for (uint32 j = 0; j < rcc->RefreshClasses.size(); j++)
+				{
+					RefreshValue *arcc = rcc->RefreshClasses.at(j);
+					Log::Write(LogLevel_Debug, GetNodeId(), "Requesting Refresh of Value: CommandClass: %s Genre %d, Instance %d, Index %d", CommandClasses::GetName(arcc->cc).c_str(), arcc->genre, arcc->instance, arcc->index);
+					if( CommandClass* cc = node->GetCommandClass( arcc->cc ) )
+					{
+						cc->RequestValue(arcc->genre, arcc->index, arcc->instance, Driver::MsgQueue_Send);
+					}
+				}
+			}
+		}
+	}
+	else /* Driver */
+	{
+		Log::Write(LogLevel_Warning, GetNodeId(), "Can't get Node");
+	}
+	return true;
+}
+
+//-----------------------------------------------------------------------------
 // <CommandClass::WriteXML>
 // Save the static node configuration data
 //-----------------------------------------------------------------------------
 void CommandClass::WriteXML
-( 
-	TiXmlElement* _ccElement
+(
+		TiXmlElement* _ccElement
 )
 {
 	char str[32];
@@ -319,6 +468,15 @@ void CommandClass::WriteXML
 	{
 		_ccElement->SetAttribute( "getsupported", "false" );
 	}
+	if ( m_isSecured )
+	{
+		_ccElement->SetAttribute( "issecured", "true" );
+	}
+	if ( m_inNIF )
+	{
+		_ccElement->SetAttribute( "innif", "true" );
+	}
+
 
 	// Write out the instances
 	for( Bitfield::Iterator it = m_instances.Begin(); it != m_instances.End(); ++ it )
@@ -349,6 +507,26 @@ void CommandClass::WriteXML
 			value->WriteXML( valueElement );
 		}
 	}
+	// Write out the TriggerRefreshValue if it exists
+	for (uint32 i = 0; i < m_RefreshClassValues.size(); i++)
+	{
+		RefreshValue *rcc = m_RefreshClassValues.at(i);
+		TiXmlElement* RefreshElement = new TiXmlElement("TriggerRefreshValue");
+		_ccElement->LinkEndChild( RefreshElement );
+		RefreshElement->SetAttribute("Genre", Value::GetGenreNameFromEnum((ValueID::ValueGenre)rcc->genre));
+		RefreshElement->SetAttribute("Instance", rcc->instance);
+		RefreshElement->SetAttribute("Index", rcc->index);
+		for (uint32 j = 0; j < rcc->RefreshClasses.size(); j++)
+		{
+			RefreshValue *arcc = rcc->RefreshClasses.at(j);
+			TiXmlElement *ClassElement = new TiXmlElement("RefreshClassValue");
+			RefreshElement->LinkEndChild(ClassElement);
+			ClassElement->SetAttribute("CommandClass", arcc->cc);
+			ClassElement->SetAttribute("RequestFlags", arcc->genre);
+			ClassElement->SetAttribute("Instance", arcc->instance);
+			ClassElement->SetAttribute("Index", arcc->index);
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -357,10 +535,10 @@ void CommandClass::WriteXML
 //-----------------------------------------------------------------------------
 string CommandClass::ExtractValue
 (
-	uint8 const* _data,
-	uint8* _scale,
-	uint8* _precision,
-	uint8 _valueOffset // = 1
+		uint8 const* _data,
+		uint8* _scale,
+		uint8* _precision,
+		uint8 _valueOffset // = 1
 )const
 {
 	uint8 const size = _data[0] & c_sizeMask;
@@ -403,7 +581,7 @@ string CommandClass::ExtractValue
 
 	// Convert the integer to a decimal string.  We avoid
 	// using floats to prevent accuracy issues.
-	char numBuf[12];
+	char numBuf[12] = {0};
 
 	if( precision == 0 )
 	{
@@ -423,8 +601,8 @@ string CommandClass::ExtractValue
 
 		// Shift the characters to make space for the decimal point.
 		// We don't worry about overwriting any minus sign since that is
-		// already written into the res string. While we're shifting, we 
-		// also look for the real starting position of the number so we 
+		// already written into the res string. While we're shifting, we
+		// also look for the real starting position of the number so we
 		// can copy it into the res string later.
 		int32 start = -1;
 		for( int32 i=0; i<decimal; ++i )
@@ -457,9 +635,9 @@ string CommandClass::ExtractValue
 //-----------------------------------------------------------------------------
 void CommandClass::AppendValue
 (
-	Msg* _msg,
-	string const& _value,
-	uint8 const _scale
+		Msg* _msg,
+		string const& _value,
+		uint8 const _scale
 )const
 {
 	uint8 precision;
@@ -481,7 +659,7 @@ void CommandClass::AppendValue
 //-----------------------------------------------------------------------------
 uint8 const CommandClass::GetAppendValueSize
 (
-	string const& _value
+		string const& _value
 )const
 {
 	uint8 size;
@@ -496,14 +674,14 @@ uint8 const CommandClass::GetAppendValueSize
 //-----------------------------------------------------------------------------
 int32 CommandClass::ValueToInteger
 (
-	string const& _value,
-	uint8* o_precision,
-	uint8* o_size
+		string const& _value,
+		uint8* o_precision,
+		uint8* o_size
 )const
 {
 	int32 val;
 	uint8 precision;
-	
+
 	// Find the decimal point
 	size_t pos = _value.find_first_of( "." );
 	if( pos == string::npos )
@@ -520,7 +698,7 @@ int32 CommandClass::ValueToInteger
 	else
 	{
 		// Remove the decimal point and convert to an integer
-		precision = (_value.size()-pos)-1;
+		precision = (uint8) ((_value.size()-pos)-1);
 
 		string str = _value.substr( 0, pos ) + _value.substr( pos+1 );
 		val = atol( str.c_str() );
@@ -573,9 +751,9 @@ int32 CommandClass::ValueToInteger
 //-----------------------------------------------------------------------------
 void CommandClass::UpdateMappedClass
 (
-	uint8 const _instance,
-	uint8 const _classId,
-	uint8 const _level
+		uint8 const _instance,
+		uint8 const _classId,
+		uint8 const _level
 )
 {
 	if( _classId )
@@ -596,10 +774,10 @@ void CommandClass::UpdateMappedClass
 // The static data for this command class has been read from the device
 //-----------------------------------------------------------------------------
 void CommandClass::ClearStaticRequest
-( 
-	uint8 _request
+(
+		uint8 _request
 )
-{ 
+{
 	m_staticRequests &= ~_request;
 }
 
@@ -609,8 +787,8 @@ void CommandClass::ClearStaticRequest
 //-----------------------------------------------------------------------------
 bool CommandClass::RequestStateForAllInstances
 (
-	uint32 const _requestFlags,
-	Driver::MsgQueue const _queue
+		uint32 const _requestFlags,
+		Driver::MsgQueue const _queue
 )
 {
 	bool res = false;

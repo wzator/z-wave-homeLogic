@@ -25,21 +25,21 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "CommandClasses.h"
-#include "Meter.h"
-#include "MultiInstance.h"
+#include "command_classes/CommandClasses.h"
+#include "command_classes/Meter.h"
+#include "command_classes/MultiInstance.h"
 #include "Defs.h"
 #include "Bitfield.h"
 #include "Msg.h"
 #include "Node.h"
 #include "Driver.h"
-#include "Log.h"
+#include "platform/Log.h"
 
-#include "ValueDecimal.h"
-#include "ValueList.h"
-#include "ValueButton.h"
-#include "ValueInt.h"
-#include "ValueBool.h"
+#include "value_classes/ValueDecimal.h"
+#include "value_classes/ValueList.h"
+#include "value_classes/ValueButton.h"
+#include "value_classes/ValueInt.h"
+#include "value_classes/ValueBool.h"
 
 using namespace OpenZWave;
 
@@ -92,7 +92,7 @@ static char const* c_gasUnits[] =
 	"cubic meters",
 	"cubic feet",
 	"",
-	"pulses"
+	"pulses",
 	"",
 	"",
 	"",
@@ -104,7 +104,7 @@ static char const* c_waterUnits[] =
 	"cubic meters",
 	"cubic feet",
 	"US gallons",
-	"pulses"
+	"pulses",
 	"",
 	"",
 	"",
@@ -250,7 +250,13 @@ bool Meter::HandleSupportedReport
 )
 {
 	bool canReset = ((_data[1] & 0x80) != 0);
-	MeterType meterType = (MeterType)(_data[1] & 0x1f);
+	int8 meterType = (MeterType)(_data[1] & 0x1f);
+	if (meterType > 4) /* size of c_meterTypes */
+	{
+		Log::Write (LogLevel_Warning, GetNodeId(), "meterType Value was greater than range. Dropping Message");
+		return false;
+	}
+
 
 	ClearStaticRequest( StaticRequest_Version );
 	if( Node* node = GetNodeUnsafe() )
@@ -376,11 +382,24 @@ bool Meter::HandleReport
 	uint8 precision = 0;
 	string valueStr = ExtractValue( &_data[2], &scale, &precision );
 
+	if (scale > 7) /* size of c_electricityLabels, c_electricityUnits, c_gasUnits, c_waterUnits */
+	{
+		Log::Write (LogLevel_Warning, GetNodeId(), "Scale was greater than range. Setting to Invalid");
+		scale = 7;
+	}
+
+
 	if( GetVersion() == 1 )
 	{
 		// In version 1, we don't know the scale until we get the first value report
 		string label;
 		string units;
+		int8 meterType = (MeterType)(_data[1] & 0x1f);
+		if (meterType > 4) /* size of c_meterTypes */
+		{
+			Log::Write (LogLevel_Warning, GetNodeId(), "meterType Value was greater than range. Dropping Message");
+			return false;
+		}
 
 		switch( (MeterType)(_data[1] & 0x1f) )
 		{
