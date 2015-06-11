@@ -421,7 +421,12 @@ int RPC_LoadSMS()
 {
 
 	printf("MUTEX_LOCK: LoadSMS\n");
-	pthread_mutex_lock(&g_criticalSectionSMS);
+	if (pthread_mutex_trylock(&g_criticalSectionSMS) != 0) {
+	    printf("MUTEX_LOCK_BUSY: LoadSMS\n");
+	    return 0;
+	}
+
+	//pthread_mutex_lock(&g_criticalSectionSMS);
 	printf("MUTEX_LOCK_OK: LoadSMS\n");
 
 	usleep(5900000);
@@ -466,7 +471,7 @@ int RPC_LoadSMS()
 
 	/* Connect to phone */
 	/* 1 means number of replies you want to wait for */
-	error = GSM_InitConnection(s, 3);
+	error = GSM_InitConnection(s, 1);
 	if (error_handler_back(error,s) == false) {
 	    pthread_mutex_unlock(&g_criticalSectionSMS);
 	    return -1;
