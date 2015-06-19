@@ -208,7 +208,7 @@ namespace OpenZWave
 #endif
 
 //#define MAX_TRIES		3	// Retry sends up to 3 times
-#define MAX_TRIES		1	// set this to one, as I believe now that a ACK failure is indication that the device is offline, hence additional attempts will not work. 
+#define MAX_TRIES		1	// set this to one, as I believe now that a ACK failure is indication that the device is offline, hence additional attempts will not work.
 #define MAX_MAX_TRIES		7	// Don't exceed this retry limit
 #define ACK_TIMEOUT	1000		// How long to wait for an ACK
 #define BYTE_TIMEOUT	150
@@ -281,6 +281,7 @@ namespace OpenZWave
 #define FUNC_ID_ZW_DELETE_SUC_RETURN_ROUTE				0x55	// Remove return routes to the SUC
 #define FUNC_ID_ZW_GET_SUC_NODE_ID					0x56	// Try to retrieve a Static Update Controller node id (zero if no SUC present)
 #define FUNC_ID_ZW_REQUEST_NODE_NEIGHBOR_UPDATE_OPTIONS			0x5a	// Allow options for request node neighbor update
+#define FUNC_ID_ZW_EXPLORE_REQUEST_INCLUSION			0x5e	// supports NWI
 #define FUNC_ID_ZW_REQUEST_NODE_INFO					0x60	// Get info (supported command classes) for the specified node
 #define FUNC_ID_ZW_REMOVE_FAILED_NODE_ID				0x61	// Mark a specified node id as failed
 #define FUNC_ID_ZW_IS_FAILED_NODE_ID					0x62	// Check to see if a specified node has failed
@@ -385,7 +386,7 @@ namespace OpenZWave
 #define SLAVE_LEARN_MODE_REMOVE							0x03	// remove node directly but only if primary/inclusion controller
 
 #define OPTION_HIGH_POWER								0x80
-
+#define OPTION_NWI										0x40	// NWI Inclusion
 //Device request related
 #define BASIC_SET										0x01
 #define BASIC_REPORT									0x03
