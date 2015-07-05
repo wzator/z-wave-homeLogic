@@ -144,6 +144,10 @@ float  dishwasher_status	= 0;
 int    dishwasher_offcounter	= 0;
 struct tm dishwasher_timestart;
 
+// globals
+int lastNodeWakeUps		= 0;
+long lastNodeWakeUpsHome	= 0;
+
 // Value-Defintions of the different String values
 
 static list<NodeInfo*> g_nodes;
@@ -1587,6 +1591,9 @@ void RPC_WakeUp( int homeID, int nodeID, Notification const* _notification )
                 fprintf(stderr, _("Could not insert row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
         }
 
+
+    lastNodeWakeUpsHome	= homeID;
+    lastNodeWakeUps	= nodeID;
 }
 
 //-----------------------------------------------------------------------------
@@ -1934,6 +1941,15 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
                 fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
         }
 
+	// zones - disabled
+
+//	if (id == 113 && valueID.GetIndex() == 10)
+//	{
+//	    zones_validate(nodeID,homeID);
+//	    printf(_("Zones validate for node %d"),nodeID);
+//	}
+
+
 	// Washer or dishwasher
 	
 	if (config.washer_node > 0 || config.dishwasher_node > 0)
@@ -1943,7 +1959,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    {
 		double power = atof(dev_value);
 		printf("power: %f, %s\n", power,dev_value);
-		if (power == 0) // ping or power off
+		if (power == 0 && lastNodeWakeUpsHome != homeID && lastNodeWakeUps != nodeID) // ping or power off // ignore wake up
 		{
 		    if ((washer_status > 0 && washer_offcounter != -1 && nodeID == config.washer_node) || (dishwasher_status > 0 && dishwasher_offcounter != -1 && nodeID == config.dishwasher_node))
 		    {
@@ -1992,6 +2008,11 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 		}
 
+
+		if (power == 0)
+		{
+		    lastNodeWakeUps = 0; // don't wait for next wake up
+		}
 		if (power > 0)
 		{
 
