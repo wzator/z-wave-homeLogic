@@ -512,8 +512,6 @@ int RPC_LoadSMS()
 	/* Set SMSC number in message */
 	CopyUnicodeString(smsO.SMSC.Number, PhoneSMSC.Number);
 
-
-
 	for (int a=0; a<10; a++)
 	{
 	    sms.Number = 0;
@@ -542,6 +540,44 @@ int RPC_LoadSMS()
 
 		if ((strlen(config.sms_phone1) > 0 && strstr(mynumber,config.sms_phone1)!= NULL) || (strstr(mynumber,config.sms_phone2)!= NULL && strlen(config.sms_phone2) > 0))
 		{
+		    if (strcmp(text,"LOCK")==0)
+		    {
+			pthread_mutex_lock(&g_criticalSection);
+		        char query[256];
+			sprintf(query,"UPDATE parameters SET parValue = 1 WHERE parName = 'alarmOn' LIMIT 1");
+			mysql_query(&mysql,query);
+
+			int lastid = mysql_insert_id(&mysql);
+
+		        pthread_mutex_unlock(&g_criticalSection);
+
+			if (lastid > 0) 
+			{
+			    char message_text[256];
+			    sprintf(message_text,"[%s] %s",config.prefix, _("LOCK active"));
+			    SMSsendNow(s, &smsO, message_text);
+			}
+		    }
+
+		    if (strcmp(text,"UNLOCK")==0)
+		    {
+			pthread_mutex_lock(&g_criticalSection);
+		        char query[256];
+			sprintf(query,"UPDATE parameters SET parValue = 0 WHERE parName = 'alarmOn' LIMIT 1");
+			mysql_query(&mysql,query);
+
+			int lastid = mysql_insert_id(&mysql);
+
+		        pthread_mutex_unlock(&g_criticalSection);
+
+			if (lastid > 0) 
+			{
+			    char message_text[256];
+			    sprintf(message_text,"[%s] %s",config.prefix, _("LOCK deactivated"));
+			    SMSsendNow(s, &smsO, message_text);
+			}
+		    }
+
 		    if (strcmp(text,"FREEDAY")==0)
 		    {
 			pthread_mutex_lock(&g_criticalSection);
@@ -2981,6 +3017,7 @@ timerHandler(sigval_t t )
 	    mysql_free_result(result);
 	}
 
+
  /////////////////////////////////////////
 
 	    sprintf(query,"SELECT zS.id, zS.endNode, zS.endValue, zS.delayTimeMin, zS.stampOnly, zS.commandclassEnd, zS.instanceEnd, zS.indexEnd, zS.parentRule, COUNT(z1.id) AS zSum1, COUNT(z2.id) AS zSum2 FROM zonesStart AS zS LEFT JOIN zonesStart AS z1 ON (z1.ruleId = zS.parentRule) LEFT JOIN zonesStart AS z2 ON (z2.ruleId = zS.parentRule AND z2.lastAction IS NOT NULL) WHERE zS.homeid = %d AND zS.actiontimestart > NOW() AND NOW() < zS.actiontimeend AND zS.active = 1 AND zS.delayTimeMin IS NOT NULL AND zS.stampOnly = 1 AND zS.lastAction IS NOT NULL AND NOW() > (zS.lastAction +  INTERVAL zS.delayTimeMin MINUTE) GROUP BY zS.id", g_homeId);
@@ -3028,7 +3065,144 @@ timerHandler(sigval_t t )
 		mysql_free_result(result);
 	    }
 
-        pthread_mutex_unlock(&g_criticalSection);
+    pthread_mutex_unlock(&g_criticalSection);
+
+ /////////////////////////////////////////
+ /* Auto Alarm */
+
+    pthread_mutex_lock(&g_criticalSection);
+
+    sprintf(query,"SELECT parValue FROM parameters WHERE parName = 'autoAlarm' LIMIT 1");
+    mysql_query(&mysql,query);
+    result = mysql_store_result(&mysql);
+    row = mysql_fetch_row(result);
+
+printf("parValue: %d\n",atoi(row[0]));
+
+    if (atoi(row[0]) == 1)
+    {
+	int lastTime = 0;
+	int alarmOn = 0;
+        char *garbage = NULL;
+
+	mysql_free_result(result);
+	sprintf(query,"SELECT parValue, ROUND(TIMESTAMPDIFF(SECOND,parTimestamp,NOW()) / 60) FROM parameters WHERE parName = 'alarmOn' LIMIT 1");
+        mysql_query(&mysql,query);
+	result = mysql_store_result(&mysql);
+
+	if (row[1])
+        	lastTime = strtol(row[1],&garbage,0);
+
+	if (row[0])
+	    alarmOn = strtol(row[0],&garbage,0);
+
+	printf("parValue: %d, %d\n",alarmOn, lastTime);
+
+	if (alarmOn == 0)
+	{
+	    mysql_free_result(result);
+	    sprintf(query,"SELECT ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1)");
+    	    mysql_query(&mysql,query);
+	    result = mysql_store_result(&mysql);
+	    num_rows = mysql_num_rows(result);
+
+
+	    if (num_rows > 0)
+	    {
+		row = mysql_fetch_row(result);
+
+	    printf("onState: %d\n",atoi(row[0]));
+		if ((atoi(row[0]) > 20 && atoi(row[0]) < 23))
+		{
+		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.onState > b1.onState OR b2.offState > b2.offState) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1)");
+		    mysql_query(&mysql,query);
+		    MYSQL_RES *result = mysql_store_result(&mysql);
+		    num_rows = mysql_num_rows(result);
+		    if (num_rows > 0)
+		    {
+			row = mysql_fetch_row(result);
+			    printf("Count: %d\n",atoi(row[0]));
+			if (atoi(row[0]) == 0)
+			{
+			    sprintf(query,"UPDATE parameters SET parValue = 1 WHERE parName = 'alarmOn' LIMIT 1");
+    			    mysql_query(&mysql,query);
+
+			    char info[4096];
+			    time_t rawtime;
+			    struct tm * timeinfo;
+		
+			    time(&rawtime);
+			    timeinfo = localtime(&rawtime);
+			    sprintf(info,_("[%s] - ALARM - : LOCK activated - Date %s"), config.prefix, asctime(timeinfo));
+
+
+			    pthread_mutex_unlock(&g_criticalSection);
+			    if (strlen(config.gg_a1) > 0)
+				RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+			    if (strlen(config.gg_a2) > 0)
+				RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+			    pthread_mutex_lock(&g_criticalSection);
+
+			}
+		    }
+
+		}
+	    }
+
+	    mysql_free_result(result);
+	}else{
+	    mysql_free_result(result);
+
+	    // check nodes
+
+		    sprintf(query,"SELECT COUNT(nodeid) FROM basicLastState WHERE onState < NOW() AND onState > DATE_SUB(NOW(), INTERVAL 15 MINUTE) AND nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1) ");
+		    mysql_query(&mysql,query);
+		    MYSQL_RES *result = mysql_store_result(&mysql);
+		    num_rows = mysql_num_rows(result);
+		    if (num_rows > 0 && lastTime > 22)
+		    {
+			row = mysql_fetch_row(result);
+			if (atoi(row[0]) > 1)
+			{
+			    sprintf(query,"UPDATE parameters SET parValue = 0 WHERE parName = 'alarmOn' LIMIT 1");
+			    mysql_query(&mysql,query);
+
+			    char info[4096];
+			    time_t rawtime;
+			    struct tm * timeinfo;
+		
+			    time(&rawtime);
+			    timeinfo = localtime(&rawtime);
+			    sprintf(info,_("[%s] - ALARM - : LOCK deactivated - %d nodes - Date %s"), config.prefix, atoi(row[0]), asctime(timeinfo));
+
+
+			    pthread_mutex_unlock(&g_criticalSection);
+
+			    alarm(info);
+
+			    pthread_mutex_lock(&g_criticalSection);
+
+			}
+		    }
+
+		    mysql_free_result(result);
+
+	}
+
+
+
+    }else{
+	mysql_free_result(result);
+    }
+
+
+    pthread_mutex_unlock(&g_criticalSection);
+
+ /////////////////////////////////////////
+
+
 
 	// /etc/zwave.conf enable/disable
 	if (config.sms_commands == 1)
