@@ -160,6 +160,8 @@ static pthread_mutex_t initMutex = PTHREAD_MUTEX_INITIALIZER;
 
 volatile GSM_Error sms_send_status;
 volatile gboolean gshutdown = FALSE;
+GSM_StateMachine *stateMachine;
+GSM_Config *cfg;
 
 // timer
 timer_t firstTimerID;
@@ -421,7 +423,7 @@ int SMSsendNow(GSM_StateMachine *s, GSM_SMSMessage *smsO, char *message_text)
 
 }
 
-int RPC_LoadSMS()
+int RPC_LoadSMS(GSM_StateMachine *s)
 {
 
 	printf("MUTEX_LOCK: LoadSMS\n");
@@ -439,8 +441,6 @@ int RPC_LoadSMS()
 	GSM_MultiSMSMessage 	sms;
 	GSM_SMSMessage 	smsD;
 	GSM_SMSMessage smsO;
-	GSM_StateMachine *s;
-	GSM_Config *cfg;
 	GSM_Error error;
         GSM_SMSFolders folders;
 	GSM_SMSC PhoneSMSC;
@@ -454,24 +454,6 @@ int RPC_LoadSMS()
 	 * charset conversion works.
 	 */
 	GSM_InitLocales(NULL);
-
-	/* Allocates state machine */
-	s = GSM_AllocStateMachine();
-	if (s == NULL) {
-		pthread_mutex_unlock(&g_criticalSectionSMS);
-		return 3;
-	}
-
-	cfg = GSM_GetConfig(s, 0);
-
-	free(cfg->Device);
-	cfg->Device = strdup(config.sms_device);
-
-	free(cfg->Connection);
-	cfg->Connection = strdup(config.sms_connection);
-
-	/* We have one valid configuration */
-	GSM_SetConfigNum(s, 1);
 
 	/* Connect to phone */
 	/* 1 means number of replies you want to wait for */
@@ -646,8 +628,6 @@ int RPC_LoadSMS()
 	    return -1;
 	}
 
-	/* Free up used memory */
-	GSM_FreeStateMachine(s);
 
 
 	pthread_mutex_unlock(&g_criticalSectionSMS);
@@ -656,15 +636,13 @@ int RPC_LoadSMS()
 
 }
 
-int RPC_SendSMS(char *recipient_number, char *message_text)
+int RPC_SendSMS(char *recipient_number, char *message_text, GSM_StateMachine *s)
 {
 // GSM
 	printf("MUTEX_LOCK: SendSMS\n");
 	pthread_mutex_lock(&g_criticalSectionSMS);
 	printf("MUTEX_LOCK_OK: SendSMS\n");
 	usleep(15900000);
-	GSM_StateMachine *s;
-	GSM_Config *cfg;
 	GSM_Error error;
 
 	GSM_SMSMessage sms;
@@ -697,25 +675,6 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 	sms.Coding = SMS_Coding_Default_No_Compression;
 	/* Class 1 message (normal) */
 	sms.Class = 1;
-
-	/* Allocates state machine */
-	s = GSM_AllocStateMachine();
-	if (s == NULL) {
-		pthread_mutex_unlock(&g_criticalSectionSMS);
-		return 3;
-	}
-
-	// Get pointer to config structure
-	cfg = GSM_GetConfig(s, 0);
-
-	free(cfg->Device);
-	cfg->Device = strdup(config.sms_device);
-
-	free(cfg->Connection);
-	cfg->Connection = strdup(config.sms_connection);
-
-	/* We have one valid configuration */
-	GSM_SetConfigNum(s, 1);
 
 	/* Connect to phone */
 	/* 1 means number of replies you want to wait for */
@@ -778,9 +737,6 @@ int RPC_SendSMS(char *recipient_number, char *message_text)
 	    pthread_mutex_unlock(&g_criticalSectionSMS);
 	    return -1;
 	}
-
-	/* Free up used memory */
-	GSM_FreeStateMachine(s);
 
 	pthread_mutex_unlock(&g_criticalSectionSMS);
 
@@ -1462,21 +1418,21 @@ void *smsNow(void * minfo)
 	int res = 0;
 
 	if (strlen(config.sms_phone1) > 0)
-    	    res = RPC_SendSMS(config.sms_phone1, (char *) info);
+    	    res = RPC_SendSMS(config.sms_phone1, (char *) info, stateMachine);
 
 	// if error try again
     	if (res == -1) {
 	    usleep(900000);
-    	    res = RPC_SendSMS(config.sms_phone1, (char *) info);
+    	    res = RPC_SendSMS(config.sms_phone1, (char *) info, stateMachine);
 	}
 	
 	if (strlen(config.sms_phone2) > 0)
-	    res = RPC_SendSMS(config.sms_phone2, (char *) info);
+	    res = RPC_SendSMS(config.sms_phone2, (char *) info, stateMachine);
 
 	// if error try again
     	if (res == -1) {
 	    usleep(900000);
-    	    res = RPC_SendSMS(config.sms_phone2, (char *) info);
+    	    res = RPC_SendSMS(config.sms_phone2, (char *) info, stateMachine);
 	}
 
 	pthread_exit(NULL);
@@ -3204,7 +3160,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	// /etc/zwave.conf enable/disable
 	if (config.sms_commands == 1)
 	{
-	    RPC_LoadSMS();
+	    RPC_LoadSMS(stateMachine);
 	}
 
 }
@@ -3278,6 +3234,26 @@ int main(int argc, char* argv[]) {
                 mysql_errno(&mysql), mysql_error(&mysql));
                 exit(0);
     }
+
+    /* Allocates state machine */
+    stateMachine = GSM_AllocStateMachine();
+
+    if (stateMachine == NULL) {
+                fprintf(stderr, "GSM_AllocStateMachine failed \n");
+		exit(0);
+    }
+
+    cfg = GSM_GetConfig(stateMachine, 0);
+
+    free(cfg->Device);
+    cfg->Device = strdup(config.sms_device);
+
+    free(cfg->Connection);
+    cfg->Connection = strdup(config.sms_connection);
+
+    /* We have one valid configuration */
+    GSM_SetConfigNum(stateMachine, 1);
+
 
     pthread_mutexattr_init(&mutexattrSMS);
     pthread_mutexattr_settype(&mutexattrSMS, PTHREAD_MUTEX_ERRORCHECK);
@@ -3866,6 +3842,9 @@ printf("Going ...\n");
             std::cout << "Exception was caught: " << e.description() << "\nExiting.\n";
         }
     }
+
+    /* Free up used memory */
+    GSM_FreeStateMachine(stateMachine);
 
     Manager::Get()->RemoveWatcher( OnNotification, NULL );
     Manager::Destroy();
