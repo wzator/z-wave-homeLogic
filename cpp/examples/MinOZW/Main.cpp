@@ -1951,7 +1951,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    {
 		double power = atof(dev_value);
 		printf("power: %f, %s\n", power,dev_value);
-		if (power == 0 && lastNodeWakeUpsHome != homeID && lastNodeWakeUps != config.washer_node) // ping or power off // ignore wake up
+		if (power == 0 && ((lastNodeWakeUpsHome == homeID && lastNodeWakeUps != config.washer_node) || lastNodeWakeUpsHome != homeID)) // ping or power off // ignore wake up
 		{
 		    if ((washer_status > 0 && washer_offcounter != -1 && nodeID == config.washer_node) || (dishwasher_status > 0 && dishwasher_offcounter != -1 && nodeID == config.dishwasher_node))
 		    {
