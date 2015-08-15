@@ -3519,7 +3519,8 @@ printf("Going ...\n");
 		    {
 			int mynode = strtol(tmp.c_str(),&garbage,0);
 		        if (mynode > 0)
-			    Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_RequestNodeNeighborUpdate, OnControllerUpdate, NULL, false, mynode, 0 );
+			    Manager::Get()->RequestNodeNeighborUpdate(g_homeId, mynode);
+			    //Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_RequestNodeNeighborUpdate, OnControllerUpdate, NULL, false, mynode, 0 );
 		    }
 		}
 
@@ -3536,7 +3537,8 @@ printf("Going ...\n");
 		    {
 			int mynode = strtol(tmp.c_str(),&garbage,0);
 		        if (mynode > 0)
-				Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_DeleteAllReturnRoutes, OnControllerUpdate, NULL, true, mynode, 0 );
+				Manager::Get()->DeleteAllReturnRoutes(g_homeId, mynode);
+				//Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_DeleteAllReturnRoutes, OnControllerUpdate, NULL, true, mynode, 0 );
 		    }
 		}
 
@@ -3547,10 +3549,11 @@ printf("Going ...\n");
 		    if (tmp.length() > 0)
 		    {
 			    int nodeF	= 0;
-			    int nodeT	= 0;
-			    sscanf(tmp.c_str(), "%d,%d", &nodeF, &nodeT);
-		        if (nodeF > 0 && nodeT > 0)
-			    Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_AssignReturnRoute, OnControllerUpdate, NULL, true, nodeF, nodeT );
+
+			    sscanf(tmp.c_str(), "%d", &nodeF);
+		        if (nodeF > 0 )
+			    Manager::Get()->AssignReturnRoute(g_homeId, nodeF);
+			    //Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_AssignReturnRoute, OnControllerUpdate, NULL, true, nodeF, nodeT );
 		    }
 		}
 
