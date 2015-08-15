@@ -981,6 +981,28 @@ uint8 Manager::GetNodeSecurity
 	return version;
 }
 
+
+//-----------------------------------------------------------------------------
+// <Manager::IsNodeZWavePlus>
+// Get if the Node is a ZWave Plus Supported Node
+//-----------------------------------------------------------------------------
+bool Manager::IsNodeZWavePlus
+(
+		uint32 const _homeId,
+		uint8 const _nodeId
+)
+{
+	uint8 version = 0;
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		version = driver->IsNodeZWavePlus( _nodeId );
+	}
+
+	return version;
+}
+
+
+
 //-----------------------------------------------------------------------------
 // <Manager::GetNodeBasic>
 // Get the basic type of a node
@@ -1050,7 +1072,10 @@ string Manager::GetNodeType
 {
 	if( Driver* driver = GetDriver( _homeId ) )
 	{
-		return driver->GetNodeType( _nodeId );
+		if (driver->IsNodeZWavePlus(_nodeId))
+			return driver->GetNodeDeviceTypeString(_nodeId);
+		else
+			return driver->GetNodeType( _nodeId );
 	}
 
 	return "Unknown";
@@ -1250,6 +1275,112 @@ string Manager::GetNodeProductType
 	}
 
 	return "Unknown";
+}
+
+
+//-----------------------------------------------------------------------------
+// <Manager::GetNodeDeviceType>
+// Get the node device type as reported in the Z-Wave+ Info report.
+//-----------------------------------------------------------------------------
+uint8 Manager::GetNodeDeviceType
+(
+		uint32 const _homeId,
+		uint8 const _nodeId
+)
+{
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		return driver->GetNodeDeviceType( _nodeId );
+	}
+
+	return 0x00; // unknown
+}
+
+//-----------------------------------------------------------------------------
+// <Manager::GetNodeDeviceType>
+// Get the node device type as reported in the Z-Wave+ Info report.
+//-----------------------------------------------------------------------------
+string Manager::GetNodeDeviceTypeString
+(
+		uint32 const _homeId,
+		uint8 const _nodeId
+)
+{
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		return driver->GetNodeDeviceTypeString( _nodeId );
+	}
+
+	return ""; // unknown
+}
+
+
+
+//-----------------------------------------------------------------------------
+// <Manager::GetNodeRole>
+// Get the node role as reported in the Z-Wave+ Info report.
+//-----------------------------------------------------------------------------
+uint8 Manager::GetNodeRole
+(
+		uint32 const _homeId,
+		uint8 const _nodeId
+)
+{
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		return driver->GetNodeRole( _nodeId );
+	}
+
+	return 0x00; // unknown
+}
+
+//-----------------------------------------------------------------------------
+// <Manager::GetNodeRole>
+// Get the node role as reported in the Z-Wave+ Info report.
+//-----------------------------------------------------------------------------
+string Manager::GetNodeRoleString
+(
+		uint32 const _homeId,
+		uint8 const _nodeId
+)
+{
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		return driver->GetNodeRoleString( _nodeId );
+	}
+
+	return ""; // unknown
+}
+
+
+uint8 Manager::GetNodePlusType
+(
+		uint32 const _homeId,
+		uint8 const _nodeId
+)
+{
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		return driver->GetNodePlusType( _nodeId );
+	}
+
+	return 0x00; // unknown
+
+}
+
+string Manager::GetNodePlusTypeString
+(
+		uint32 const _homeId,
+		uint8 const _nodeId
+)
+{
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		return driver->GetNodePlusTypeString( _nodeId );
+	}
+
+	return ""; // unknown
+
 }
 
 //-----------------------------------------------------------------------------
@@ -2075,10 +2206,16 @@ bool Manager::GetValueAsString
 				{
 					if( ValueList* value = static_cast<ValueList*>( driver->GetValue( _id ) ) )
 					{
-						ValueList::Item const& item = value->GetItem();
-						*o_value = item.m_label;
+						ValueList::Item const *item = value->GetItem();
+						if (item == NULL) {
+							o_value = NULL;
+							res = false;
+						} else {
+							*o_value = item->m_label;
+							res = true;
+						}
 						value->Release();
-						res = true;
+
 					} else {
 						OZW_ERROR(OZWException::OZWEXCEPTION_INVALID_VALUEID, "Invalid ValueID passed to GetValueAsString");
 					}
@@ -2183,11 +2320,14 @@ bool Manager::GetValueListSelection
 				LockGuard LG(driver->m_nodeMutex);
 				if( ValueList* value = static_cast<ValueList*>( driver->GetValue( _id ) ) )
 				{
-					ValueList::Item const& item = value->GetItem();
-					if( item.m_label.length() > 0 )
+					ValueList::Item const *item = value->GetItem();
+					if( item != NULL && item->m_label.length() > 0)
 					{
-						*o_value = item.m_label;
+						*o_value = item->m_label;
 						res = true;
+					} else {
+						o_value = NULL;
+						Log::Write(LogLevel_Warning, "ValueList returned a NULL value for GetValueListSelection: %s", value->GetLabel().c_str());
 					}
 					value->Release();
 				} else {
@@ -2223,10 +2363,15 @@ bool Manager::GetValueListSelection
 				LockGuard LG(driver->m_nodeMutex);
 				if( ValueList* value = static_cast<ValueList*>( driver->GetValue( _id ) ) )
 				{
-					ValueList::Item const& item = value->GetItem();
-					*o_value = item.m_value;
+					ValueList::Item const *item = value->GetItem();
+					if (item == NULL) {
+						res = false;
+					} else {
+						*o_value = item->m_value;
+						res = true;
+					}
 					value->Release();
-					res = true;
+
 				} else {
 					OZW_ERROR(OZWException::OZWEXCEPTION_INVALID_VALUEID, "Invalid ValueID passed to GetValueListSelection");
 				}
@@ -3171,6 +3316,26 @@ uint32 Manager::GetAssociations
 }
 
 //-----------------------------------------------------------------------------
+// <Manager::GetAssociations>
+// Gets the associations for a group
+//-----------------------------------------------------------------------------
+uint32 Manager::GetAssociations
+(
+		uint32 const _homeId,
+		uint8 const _nodeId,
+		uint8 const _groupIdx,
+		InstanceAssociation** o_associations
+)
+{
+	if( Driver* driver = GetDriver( _homeId ) )
+	{
+		return driver->GetAssociations( _nodeId, _groupIdx, o_associations );
+	}
+
+	return 0;
+}
+
+//-----------------------------------------------------------------------------
 // <Manager::GetMaxAssociations>
 // Gets the maximum number of associations for a group
 //-----------------------------------------------------------------------------
@@ -3217,12 +3382,13 @@ void Manager::AddAssociation
 		uint32 const _homeId,
 		uint8 const _nodeId,
 		uint8 const _groupIdx,
-		uint8 const _targetNodeId
+		uint8 const _targetNodeId,
+		uint8 const _instance
 )
 {
 	if( Driver* driver = GetDriver( _homeId ) )
 	{
-		driver->AddAssociation( _nodeId, _groupIdx, _targetNodeId );
+		driver->AddAssociation( _nodeId, _groupIdx, _targetNodeId, _instance );
 	}
 }
 
@@ -3235,12 +3401,13 @@ void Manager::RemoveAssociation
 		uint32 const _homeId,
 		uint8 const _nodeId,
 		uint8 const _groupIdx,
-		uint8 const _targetNodeId
+		uint8 const _targetNodeId,
+		uint8 const _instance
 )
 {
 	if( Driver* driver = GetDriver( _homeId ) )
 	{
-		driver->RemoveAssociation( _nodeId, _groupIdx, _targetNodeId );
+		driver->RemoveAssociation( _nodeId, _groupIdx, _targetNodeId, _instance );
 	}
 }
 
