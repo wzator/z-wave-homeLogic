@@ -3070,7 +3070,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	    printf("onState: %d\n",atoi(row[0]));
 		if ((atoi(row[0]) > 20 && atoi(row[0]) < 23))
 		{
-		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.onState > b1.onState OR b2.offState > b2.offState) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1)");
+		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.onState > DATE_ADD(b1.onState, INTERVAL 30 SECOND) OR b2.offState > DATE_ADD(b2.offState, INTERVAL 30 SECOND)) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1)");
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
 		    num_rows = mysql_num_rows(result);
