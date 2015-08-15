@@ -3114,7 +3114,7 @@ printf("parValue: %d\n",atoi(row[0]));
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
 		    num_rows = mysql_num_rows(result);
-		    if (num_rows > 0 && lastTime > 22)
+		    if (num_rows > 0 && lastTime > 20)
 		    {
 			row = mysql_fetch_row(result);
 			if (atoi(row[0]) > 1)
