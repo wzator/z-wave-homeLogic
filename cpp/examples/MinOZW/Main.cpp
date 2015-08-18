@@ -2142,7 +2142,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    mysql_real_escape_string(&mysql, to, dev_value, strlen(dev_value));
 	    MYSQL_ROW row;
 
-	    sprintf(query,"SELECT id, endNode, endValue, delayTimeMin, stampOnly, commandclassEnd, instanceEnd, indexEnd FROM zonesStart WHERE homeid = %d AND startNode = %d AND startValue = \"%s\" AND actiontimestart > NOW() AND NOW() < actiontimeend AND active = 1 AND commandclassStart = %d AND instanceStart = %d AND indexStart = %d", homeID, nodeID, to, id, instanceID, valueID.GetIndex());
+	    sprintf(query,"SELECT id, endNode, endValue, delayTimeMin, stampOnly, commandclassEnd, instanceEnd, indexEnd FROM zonesStart WHERE homeid = %d AND startNode = %d AND startValue = \"%s\" AND NOW() > actiontimestart AND NOW() < actiontimeend AND active = 1 AND commandclassStart = %d AND instanceStart = %d AND indexStart = %d", homeID, nodeID, to, id, instanceID, valueID.GetIndex());
 	    int res = mysql_query(&mysql,query);
 	    if (res == 0) {
 		MYSQL_RES *result = mysql_store_result(&mysql);
