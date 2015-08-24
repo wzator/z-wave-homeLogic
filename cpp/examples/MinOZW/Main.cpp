@@ -2154,13 +2154,13 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    	    {
 			printf(_("Action zoneStart : %s\n"),row[0]);
 			int stampOnly		= atoi(row[4]);
-//			int delayTimeMin		= atoi(row[3]);
-			int idTable			= atoi(row[0]);
-			int endNode			= atoi(row[1]);
+//			int delayTimeMin	= atoi(row[3]);
+			int idTable		= atoi(row[0]);
+			int endNode		= atoi(row[1]);
 			int endValue		= atoi(row[2]);
-			int commandClassEnd		= atoi(row[4]);
-			int instanceEnd		= atoi(row[5]);
-			int indexEnd		= atoi(row[6]);
+			int commandClassEnd	= atoi(row[5]);
+			int instanceEnd		= atoi(row[6]);
+			int indexEnd		= atoi(row[7]);
 
 			if (stampOnly == 0)
 			{
