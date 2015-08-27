@@ -3498,6 +3498,18 @@ printf("Going ...\n");
 		    }
 		}
 
+		if (trim(data.substr(0,8).c_str()) == "TESTNODE")
+		{
+		    string tmp = data.substr(8,data.length()-8);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int mynode = strtol(tmp.c_str(),&garbage,0);
+		        if (mynode > 0)
+			    Manager::Get()->TestNetworkNode(g_homeId, mynode, 3);
+		    }
+		}
+
 
 		if (trim(data.substr(0,7).c_str()) == "REFRESH")
 		{
