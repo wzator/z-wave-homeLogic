@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20150530
+//	Main.cpp v0.20151011
 //
 //	Based on minimal application to test OpenZWave.
 //
@@ -118,6 +118,7 @@ struct config_type
 	int    light_node;
 	int    power_node[255];
 	int    valve_node[255];
+	int    smoke_node[255];
 	int    door_node;
 	char   tv_ip[64];
 	char   tv_smart[64];
@@ -2181,6 +2182,22 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	if (strlen(config.gg_a1) > 0 || strlen(config.gg_a1) > 0 || strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
 	{
 
+	    // SMOKE
+
+	    for (int i=0; i<255; i++)
+	    {
+		if (config.smoke_node[i] == 0)
+		{
+		    break;
+		}
+
+		if (config.smoke_node[i] == nodeID  && strcmp(dev_value,"1") == 0 )
+	        {
+		}
+	    }
+
+	    // FLOOD
+
 	    if (strcmp(label.c_str(),"Flood") == 0 && strcmp(dev_value,"0") == 0 && alarmstatus == 1)
 	    {
 
@@ -2569,6 +2586,23 @@ int get_configuration(struct config_type *config, char *path)
 			continue;
 		}
 
+		memset(tmp,0,99);
+		strncpy(tmp,token,19);
+		if ( (strcmp(tmp,"ZWAVE_SMOKEDETECTOR") == 0) && (strlen(val) != 0) )
+		{
+		    memset(tmp,0,99);
+		    strncpy(tmp,token+19,strlen(token)-19);
+
+			if (strlen(tmp)>0)
+			{
+			    int p = atoi(tmp);
+			    if (p>0)
+			    {
+				config->smoke_node[p] = atoi(val);
+			    }
+			}
+			continue;
+		}
 
 		memset(tmp,0,99);
 		strncpy(tmp,token,13);
@@ -2587,9 +2621,6 @@ int get_configuration(struct config_type *config, char *path)
 			}
 			continue;
 		}
-
-
-
 
 		if ( (strcmp(token,"ZWAVE_WASHER") == 0) && (strlen(val) != 0) )
 		{
@@ -3322,9 +3353,6 @@ printf("Going ...\n");
         Manager::Get()->WriteConfig(g_homeId);
 
 
-
-
-
 //	xmlrpc_int32 generic = Manager::Get()->GetNodeGeneric( g_homeId, 5 );
 //	xmlrpc_int32 specific = Manager::Get()->GetNodeSpecific( g_homeId, 5 );
 
@@ -3344,8 +3372,9 @@ printf("Going ...\n");
 
         //Manager::Get()->SetNodeName(g_homeId, 3, "Lampshade");
 
+	std::string dataOK = "OK\n";
 
-    // Start timer
+        // Start timer
         makeTimer((char *)"ACTIONS", &firstTimerID, 60, 60);
 
         try {
@@ -3370,25 +3399,29 @@ printf("Going ...\n");
 
 		if (trim(data.c_str()) == "ALARMON")
 		{
-		     bool res = setValue(g_homeId,config.alarm_node,1);
+		    bool res = setValue(g_homeId,config.alarm_node,1);
+		    new_sock << dataOK;
                     printf("ALARM ON = NODE %d : %d\n",config.alarm_node, res);
 		}
 
 		if (trim(data.c_str()) == "ALARMOFF")
 		{
 		    bool res = setValue(g_homeId,config.alarm_node,0);
+		    new_sock << dataOK;
                     printf("ALARM OFF = NODE %d \n",config.alarm_node, res);
 		}
 
 		if (trim(data.c_str()) == "LIGHTON1")
 		{
 		     bool res = setValue(g_homeId,config.light_node,255);
+		    new_sock << dataOK;
                     printf("LIGHT ON = NODE %d : %d\n",config.light_node, res);
 		}
 
 		if (trim(data.c_str()) == "LIGHTOFF1")
 		{
 		    bool res = setValue(g_homeId,config.light_node,0);
+		    new_sock << dataOK;
                     printf("LIGHT OFF = NODE %d \n",config.light_node, res);
 		}
 
@@ -3405,7 +3438,8 @@ printf("Going ...\n");
 			    if (config.valve_node[mynode] > 0)
 			    {
 				bool res = setValue(g_homeId,config.valve_node[mynode],0);
-                	        printf("VALVE OFF = NODE %d \n",config.valve_node[mynode], res);
+				new_sock << dataOK;
+				printf("VALVE OFF = NODE %d \n",config.valve_node[mynode], res);
                 	    }
                 	}
                     }
@@ -3424,6 +3458,7 @@ printf("Going ...\n");
 			    if (config.valve_node[mynode] > 0)
 			    {
 				bool res = setValue(g_homeId,config.valve_node[mynode],255);
+				new_sock << dataOK;
                 	        printf("VALVE ON = NODE %d \n",config.valve_node[mynode], res);
                 	    }
                 	}
@@ -3434,18 +3469,21 @@ printf("Going ...\n");
 		if (trim(data.c_str()) == "TVOFF")
 		{
 		    tvManager((char *) "TVOFF",(char *) "");
+		    new_sock << dataOK;
                     printf("TV OFF\n");
 		}
 
 		if (trim(data.c_str()) == "TVON")
 		{
 		    tvManager((char *) "TVON",(char *) "");
+		    new_sock << dataOK;
                     printf("TVON\n");
 		}
 
 		if (trim(data.c_str()) == "TVKEYTV")
 		{
 		    tvManager((char *) "TVKEYTV",(char *) "");
+		    new_sock << dataOK;
                     printf("TVKEYTV\n");
 		}
 
@@ -3461,6 +3499,7 @@ printf("Going ...\n");
 			    if (config.power_node[mynode] > 0)
 			    {
 				bool res = setValue(g_homeId,config.power_node[mynode],255);
+				new_sock << dataOK;
                 		printf("POWER ON = NODE %d : %d\n",config.power_node[mynode], res);
                 	    }
                 	}
@@ -3480,6 +3519,7 @@ printf("Going ...\n");
 			    if (config.power_node[mynode] > 0)
 			    {
 				bool res = setValue(g_homeId,config.power_node[mynode],0);
+	    			new_sock << dataOK;
                 	        printf("POWER OFF = NODE %d \n",config.power_node[mynode], res);
                 	    }
                 	}
@@ -3493,8 +3533,11 @@ printf("Going ...\n");
 		    if (tmp.length() > 0)
 		    {
 			int mynode = strtol(tmp.c_str(),&garbage,0);
-		        if (mynode > 0)
+		        if (mynode > 0) 
+			{
 				Manager::Get()->RequestNodeState( g_homeId, mynode );
+				new_sock << dataOK;
+			}
 		    }
 		}
 
@@ -3506,7 +3549,10 @@ printf("Going ...\n");
 		    {
 			int mynode = strtol(tmp.c_str(),&garbage,0);
 		        if (mynode > 0)
+			{
 			    Manager::Get()->TestNetworkNode(g_homeId, mynode, 3);
+			    new_sock << dataOK;
+			}
 		    }
 		}
 
@@ -3519,7 +3565,10 @@ printf("Going ...\n");
 		    {
 			int mynode = strtol(tmp.c_str(),&garbage,0);
 		        if (mynode > 0)
+			{
 			    Manager::Get()->RefreshNodeInfo( g_homeId, mynode );
+			    new_sock << dataOK;
+			}
 		    }
 		}
 
@@ -3531,14 +3580,18 @@ printf("Going ...\n");
 		    {
 			int mynode = strtol(tmp.c_str(),&garbage,0);
 		        if (mynode > 0)
+			{
 			    Manager::Get()->RequestNodeNeighborUpdate(g_homeId, mynode);
 			    //Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_RequestNodeNeighborUpdate, OnControllerUpdate, NULL, false, mynode, 0 );
+			    new_sock << dataOK;
+			}
 		    }
 		}
 
 		if (trim(data.c_str()) == "SAVECONFIG")
 		{
 		        Manager::Get()->WriteConfig(g_homeId);
+    			new_sock << dataOK;
 		}
 
 		if (trim(data.substr(0,8).c_str()) == "DELROUTE")
@@ -3549,8 +3602,11 @@ printf("Going ...\n");
 		    {
 			int mynode = strtol(tmp.c_str(),&garbage,0);
 		        if (mynode > 0)
+			{
 				Manager::Get()->DeleteAllReturnRoutes(g_homeId, mynode);
 				//Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_DeleteAllReturnRoutes, OnControllerUpdate, NULL, true, mynode, 0 );
+				new_sock << dataOK;
+			}
 		    }
 		}
 
@@ -3564,8 +3620,11 @@ printf("Going ...\n");
 
 			    sscanf(tmp.c_str(), "%d", &nodeF);
 		        if (nodeF > 0 )
+			{
 			    Manager::Get()->AssignReturnRoute(g_homeId, nodeF);
 			    //Manager::Get()->BeginControllerCommand( g_homeId, Driver::ControllerCommand_AssignReturnRoute, OnControllerUpdate, NULL, true, nodeF, nodeT );
+	    		    new_sock << dataOK;
+			}
 		    }
 		}
 
@@ -3583,7 +3642,7 @@ printf("Going ...\n");
         	    	    pthread_mutex_lock(&g_criticalSection);
 				Manager::Get()->SetConfigParam(g_homeId, node, par, valpar);
 			    pthread_mutex_unlock(&g_criticalSection);
-
+			    new_sock << dataOK;
 		    	    printf("Node %d Parameter %d to %d\n",node,par,valpar);
 			}
 		}
@@ -3610,7 +3669,7 @@ printf("Going ...\n");
 			    }
 		
 				setValueByAll(g_homeId, node, id, instance, index, &valpar);
-
+				new_sock << dataOK;
                 	        printf("COMMS = NODE %d CLASS %d INSTANCE %d INDEX %d SET \"%s\" (%d) \n",node, id, instance, index, valpar, size);
 
 			}
@@ -3631,7 +3690,7 @@ printf("Going ...\n");
 
 			    sscanf(tmp.c_str(), "%d,%d,%d,%d,%d", &node, &id, &instance, &index, &valpar);
 				setValueByAll(g_homeId, node, id, instance, index, &valpar);
-
+				new_sock << dataOK;
                 	        printf("COMMI = NODE %d CLASS %d INSTANCE %d INDEX %d SET %d \n",node, id, instance, index, valpar);
 
 			}
@@ -3651,6 +3710,7 @@ printf("Going ...\n");
 			    sscanf(tmp.c_str(), "%d,%d,%d", &node, &valpar, &instance);
 				setValueByInstance(g_homeId,node,&valpar,instance);
                 	        printf("BASICI = NODE %d SET %d \n",node, valpar);
+		    	        new_sock << dataOK;
 
 			}
 		}
@@ -3665,9 +3725,9 @@ printf("Going ...\n");
 			    int node	= 0;
 			    int valpar	= 0;
 			    sscanf(tmp.c_str(), "%d,%d", &node, &valpar);
-				setValue(g_homeId,node,valpar);
-                	        printf("BASICA = NODE %d SET %d \n",node, valpar);
-
+			    setValue(g_homeId,node,valpar);
+                	    printf("BASICA = NODE %d SET %d \n",node, valpar);
+	    		    new_sock << dataOK;
 			}
 		}
 
@@ -3728,7 +3788,7 @@ printf("Going ...\n");
 		        pthread_mutex_unlock(&g_criticalSection);
 
 		        Manager::Get()->WriteConfig(g_homeId);
-
+			new_sock << dataOK;
 
 		}
 
@@ -3739,6 +3799,7 @@ printf("Going ...\n");
 
 			pthread_t sms_thread;
 			pthread_create(&sms_thread, NULL, smsNow, &info);
+			new_sock << dataOK;
 
 		}
 
