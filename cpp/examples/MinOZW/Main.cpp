@@ -1112,7 +1112,7 @@ int RPC_SendGG(int number, unsigned char *text)
 
 }
 
-bool setPoint (int32 home, int32 node, string int_value)
+bool setPoint (int32 home, int32 node, string int_value, int32 int_index)
 {
 	bool response = 0;
 
@@ -1124,7 +1124,7 @@ bool setPoint (int32 home, int32 node, string int_value)
 			int id = (*it).GetCommandClassId();
 			//int inst = (*it).GetInstance();
 			int index = (*it).GetIndex();
-			if (id == 67 && index == 1)
+			if (id == 67 && index == int_index)
 			{
 				response = Manager::Get()->SetValue( *it, int_value );
 
@@ -2893,7 +2893,7 @@ timerHandler(sigval_t t )
 
 ////////////////////////////////////
 
-    sprintf(query,"SELECT zonesThermo.thermonode,zonesThermo.value FROM zonesThermo LEFT JOIN thermostat ON (thermostat.node = zonesThermo.thermonode AND thermostat.homeid = zonesThermo.homeid) WHERE TIME(NOW()) > actiontimestart AND TIME(NOW()) < actiontimeend AND zonesThermo.value <> thermostat.temp AND zonesThermo.active = 1");
+    sprintf(query,"SELECT zonesThermo.thermonode,zonesThermo.value,zonesThermo.thermoIndex FROM zonesThermo LEFT JOIN thermostat ON (thermostat.node = zonesThermo.thermonode AND thermostat.homeid = zonesThermo.homeid) WHERE TIME(NOW()) > actiontimestart AND TIME(NOW()) < actiontimeend AND zonesThermo.value <> thermostat.temp AND zonesThermo.active = 1");
 
         if(mysql_query(&mysql, query))
         {
@@ -2908,7 +2908,7 @@ timerHandler(sigval_t t )
 		while ((row = mysql_fetch_row(result)))
 	        {
 		    printf("THERMONODE %d SET VALUE %d\n",atoi(row[0]),atoi(row[1]));
-		    setPoint(g_homeId,atoi(row[0]),row[1]);
+		    setPoint(g_homeId,atoi(row[0]),row[1], atoi(row[2]));
 		}
 	    }
 	    else
