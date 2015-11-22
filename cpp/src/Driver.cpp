@@ -1310,6 +1310,9 @@ bool Driver::MoveMessagesToWakeUpQueue
 							if( !m_currentMsg->IsWakeUpNoMoreInformationCommand() && !m_currentMsg->IsNoOperation() )
 							{
 								Log::Write( LogLevel_Info, _targetNodeId, "Node not responding - moving message to Wake-Up queue: %s", m_currentMsg->GetAsString().c_str() );
+								/* reset the sendAttempts */
+								m_currentMsg->SetSendAttempts(0);
+
 								MsgQueueItem item;
 								item.m_command = MsgQueueCmd_SendMsg;
 								item.m_msg = m_currentMsg;
@@ -1347,6 +1350,8 @@ bool Driver::MoveMessagesToWakeUpQueue
 									if( !item.m_msg->IsWakeUpNoMoreInformationCommand() && !item.m_msg->IsNoOperation() )
 									{
 										Log::Write( LogLevel_Info, item.m_msg->GetTargetNodeId(), "Node not responding - moving message to Wake-Up queue: %s", item.m_msg->GetAsString().c_str() );
+										/* reset any SendAttempts */
+										item.m_msg->SetSendAttempts(0);
 										wakeUp->QueueMsg( item );
 									}
 									else
@@ -1361,6 +1366,7 @@ bool Driver::MoveMessagesToWakeUpQueue
 								if( _targetNodeId == item.m_nodeId )
 								{
 									Log::Write( LogLevel_Info, _targetNodeId, "Node not responding - moving QueryStageComplete command to Wake-Up queue" );
+
 									wakeUp->QueueMsg( item );
 									remove = true;
 								}
@@ -1370,6 +1376,7 @@ bool Driver::MoveMessagesToWakeUpQueue
 								if( _targetNodeId == item.m_cci->m_controllerCommandNode )
 								{
 									Log::Write( LogLevel_Info, _targetNodeId, "Node not responding - moving controller command to Wake-Up queue: %s", c_controllerCommandNames[item.m_cci->m_controllerCommand] );
+
 									wakeUp->QueueMsg( item );
 									remove = true;
 								}
@@ -3864,7 +3871,7 @@ void Driver::CommonAddNodeStatusRequestHandler
 			state = ControllerState_Completed;
 			if( m_currentControllerCommand != NULL && m_currentControllerCommand->m_controllerCommandNode != 0xff )
 			{
-				InitNode( m_currentControllerCommand->m_controllerCommandNode, true, m_currentControllerCommand->m_controllerCommandArg, m_currentControllerCommand->m_controllerDeviceProtocolInfo, m_currentControllerCommand->m_controllerDeviceProtocolInfoLength );
+				InitNode( m_currentControllerCommand->m_controllerCommandNode, true, m_currentControllerCommand->m_controllerCommandArg != 0, m_currentControllerCommand->m_controllerDeviceProtocolInfo, m_currentControllerCommand->m_controllerDeviceProtocolInfoLength );
 			}
 
 			// Not sure about the new controller function here.

@@ -409,6 +409,10 @@ void WakeUp::QueueMsg
 			++it;
 		}
 	}
+	/* make sure the SendAttempts is reset to 0 */
+	if (_item.m_command == Driver::MsgQueueCmd_SendMsg)
+		_item.m_msg->SetSendAttempts(0);
+
 	m_pendingQueue.push_back( _item );
 	m_mutex->Unlock();
 }
