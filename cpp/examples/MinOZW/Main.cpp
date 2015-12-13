@@ -79,6 +79,7 @@ using namespace OpenZWave;
 
 static uint32 g_homeId = 0;
 static bool g_initFailed = false;
+static bool g_initStatus = true; /* initialising status - don't write notifications */
 
 int alarmstatus = 0;
 
@@ -1668,6 +1669,11 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 
 	snprintf( dev_value, 1024, "%d", value );
 
+	if (g_initStatus == true)
+	{
+	    return;
+	}
+
         sprintf(query, "INSERT INTO basic (homeid,node,instance,valueINT,parentId) VALUES (");
 
 	if (value == 0)
@@ -1929,10 +1935,13 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 	sprintf(query, "%s,YEAR(NOW()))",query);
 
-        if(mysql_query(&mysql, query))
-        {
+	if (g_initStatus == false)
+	{
+    	    if(mysql_query(&mysql, query))
+    	    {
                 fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
-        }
+    	    }
+	}
 
 	// zones - disabled
 
@@ -1945,7 +1954,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 	// Washer or dishwasher
 	
-	if (config.washer_node > 0 || config.dishwasher_node > 0)
+	if ((config.washer_node > 0 || config.dishwasher_node > 0) && g_initStatus == false)
 	{
 	    // index = 8
 	    if (homeID == config.zwave_id && valueID.GetIndex() == 8 && id == 50 && (nodeID == config.washer_node || nodeID == config.dishwasher_node))
@@ -2137,6 +2146,11 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    }
 	}
 
+	if (g_initStatus == true)
+	{
+	    return ;
+	}
+
 	// Actions ZoneStart
 
 	    char *to = new char[(strlen(dev_value) * 2) + 1];
@@ -2193,6 +2207,29 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 		if (config.smoke_node[i] == nodeID  && strcmp(dev_value,"1") == 0 )
 	        {
+		    char info[4096];
+		    time_t rawtime;
+		    struct tm * timeinfo;
+		
+		    time(&rawtime);
+		    timeinfo = localtime(&rawtime);
+
+		    sprintf(info,_("[%s] - FIRE - : Node %d Date %s"), config.prefix, nodeID, asctime(timeinfo));
+
+		    if (strlen(config.gg_a1) > 0)
+			RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+		    if (strlen(config.gg_a2) > 0)
+			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		    //  fork for sms because too slow
+		    if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
+		    {
+			pthread_t sms_thread;
+			pthread_create(&sms_thread, NULL, smsNow, &info);
+			usleep(900000);
+		    }
+
 		}
 	    }
 
@@ -3351,7 +3388,7 @@ printf("Going ...\n");
 
 
         Manager::Get()->WriteConfig(g_homeId);
-
+	g_initStatus = false;
 
 //	xmlrpc_int32 generic = Manager::Get()->GetNodeGeneric( g_homeId, 5 );
 //	xmlrpc_int32 specific = Manager::Get()->GetNodeSpecific( g_homeId, 5 );
