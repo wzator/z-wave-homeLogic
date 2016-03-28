@@ -37,7 +37,11 @@
 #include "platform/Event.h"
 #include "platform/Mutex.h"
 #include "platform/SerialController.h"
+#ifdef WINRT
+#include "platform/winRT/HidControllerWinRT.h"
+#else
 #include "platform/HidController.h"
+#endif
 #include "platform/Thread.h"
 #include "platform/Log.h"
 #include "platform/TimeStamp.h"
@@ -137,6 +141,7 @@ Driver::Driver
 		ControllerInterface const& _interface
 ):
 m_driverThread( new Thread( "driver" ) ),
+m_initMutex(new Mutex()),
 m_exit( false ),
 m_init( false ),
 m_awakeNodesQueried( false ),
@@ -266,7 +271,9 @@ Driver::~Driver
 	// The order of the statements below has been achieved by mitigating freed memory
 	//references using a memory allocator checker. Do not rearrange unless you are
 	//certain memory won't be referenced out of order. --Greg Satz, April 2010
+	m_initMutex->Lock();
 	m_exit = true;
+	m_initMutex->Unlock();
 
 	m_pollThread->Stop();
 	m_pollThread->Release();
@@ -278,6 +285,8 @@ Driver::~Driver
 
 	m_controller->Close();
 	m_controller->Release();
+
+	m_initMutex->Release();
 
 	if( m_currentMsg != NULL )
 	{
@@ -526,6 +535,14 @@ bool Driver::Init
 		uint32 _attempts
 )
 {
+	m_initMutex->Lock();
+
+	if (m_exit)
+	{
+		m_initMutex->Unlock();
+		return false;
+	}
+
 	m_Controller_nodeId = -1;
 	m_waitingForAck = false;
 
@@ -535,6 +552,7 @@ bool Driver::Init
 	if( !m_controller->Open( m_controllerPath ) )
 	{
 		Log::Write( LogLevel_Warning, "WARNING: Failed to init the controller (attempt %d)", _attempts );
+		m_initMutex->Unlock();
 		return false;
 	}
 
@@ -552,6 +570,8 @@ bool Driver::Init
 	//Msg* msg = new Msg( "FUNC_ID_ZW_SET_PROMISCUOUS_MODE", 0xff, REQUEST, FUNC_ID_ZW_SET_PROMISCUOUS_MODE, false, false );
 	//msg->Append( 0xff );
 	//SendMsg( msg );
+
+	m_initMutex->Unlock();
 
 	// Init successful
 	return true;
@@ -1214,7 +1234,20 @@ bool Driver::WriteMsg
 		}
 	} else {
 		Log::Write( LogLevel_Info, nodeId, "Sending (%s) message (%sCallback ID=0x%.2x, Expected Reply=0x%.2x) - %s", c_sendQueueNames[m_currentMsgQueueSource], attemptsstr.c_str(), m_expectedCallbackId, m_expectedReply, m_currentMsg->GetAsString().c_str() );
-		m_controller->Write( m_currentMsg->GetBuffer(), m_currentMsg->GetLength() );
+		uint32 bytesWritten = m_controller->Write(m_currentMsg->GetBuffer(), m_currentMsg->GetLength());
+
+		if (bytesWritten == 0)
+		{
+			//0 will be returned when the port is closed or something bad happened
+			//so send notification
+			Notification* notification = new Notification(Notification::Type_DriverFailed);
+			notification->SetHomeAndNodeIds(m_homeId, m_currentMsg->GetTargetNodeId());
+			QueueNotification(notification);
+			NotifyWatchers();
+
+			m_driverThread->Stop();
+			return false;
+		}
 	}
 	m_writeCnt++;
 
@@ -2615,7 +2648,7 @@ void Driver::HandleSerialAPIGetInitDataResponse
 							{
 								// The node was read in from the config, so we
 								// only need to get its current state
-								node->SetQueryStage( Node::QueryStage_Probe1 );
+								node->SetQueryStage( Node::QueryStage_CacheLoad );
 							}
 
 						}
@@ -2987,7 +3020,7 @@ void Driver::HandleSendDataRequest
 			{
 				if( m_currentMsg &&  m_currentMsg->IsNoOperation() && node != NULL &&
 						( node->GetCurrentQueryStage() == Node::QueryStage_Probe  ||
-								node->GetCurrentQueryStage() == Node::QueryStage_Probe1 ) )
+								node->GetCurrentQueryStage() == Node::QueryStage_CacheLoad ) )
 				{
 					node->QueryStageRetry( node->GetCurrentQueryStage(), 3 );
 				}
@@ -3704,9 +3737,17 @@ bool Driver::HandleApplicationUpdateRequest
 		case UPDATE_STATE_NEW_ID_ASSIGNED:
 		{
 			Log::Write( LogLevel_Info, nodeId, "** Network change **: ID %d was assigned to a new Z-Wave node", nodeId );
-
-			// Request the node protocol info (also removes any existing node and creates a new one)
-			InitNode( nodeId );
+                        // Check if the new node id is equal to the current one.... if so no operation is needed, thus no remove and add is necessary
+                        if ( _data[3] != _data[6] )
+                        {
+                        	// Request the node protocol info (also removes any existing node and creates a new one)
+			        InitNode( nodeId );	
+                        }
+                        else 
+                        {
+                        	Log::Write(LogLevel_Info, nodeId, "Not Re-assigning NodeID as old and new NodeID match");
+                        }
+			
 			break;
 		}
 		case UPDATE_STATE_ROUTING_PENDING:
@@ -4712,7 +4753,7 @@ string Driver::GetNodeLocation
 // Get the manufacturer Id string value with the specified ID
 // Returns a copy of the string rather than a const ref for thread safety
 //-----------------------------------------------------------------------------
-string Driver::GetNodeManufacturerId
+uint16 Driver::GetNodeManufacturerId
 (
 		uint8 const _nodeId
 )
@@ -4723,7 +4764,7 @@ string Driver::GetNodeManufacturerId
 		return node->GetManufacturerId();
 	}
 
-	return "";
+	return 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -4731,7 +4772,7 @@ string Driver::GetNodeManufacturerId
 // Get the product type string value with the specified ID
 // Returns a copy of the string rather than a const ref for thread safety
 //-----------------------------------------------------------------------------
-string Driver::GetNodeProductType
+uint16 Driver::GetNodeProductType
 (
 		uint8 const _nodeId
 )
@@ -4742,7 +4783,7 @@ string Driver::GetNodeProductType
 		return node->GetProductType();
 	}
 
-	return "";
+	return 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -4750,7 +4791,7 @@ string Driver::GetNodeProductType
 // Get the product Id string value with the specified ID
 // Returns a copy of the string rather than a const ref for thread safety
 //-----------------------------------------------------------------------------
-string Driver::GetNodeProductId
+uint16 Driver::GetNodeProductId
 (
 		uint8 const _nodeId
 )
@@ -4761,7 +4802,7 @@ string Driver::GetNodeProductId
 		return node->GetProductId();
 	}
 
-	return "";
+	return 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -5898,14 +5939,17 @@ void Driver::NotifyWatchers
 		/* check the any ValueID's sent as part of the Notification are still valid */
 		switch (notification->GetType()) {
 			case Notification::Type_ValueChanged:
-			case Notification::Type_ValueRefreshed:
-				if (!GetValue(notification->GetValueID())) {
+			case Notification::Type_ValueRefreshed: {
+				Value *val = GetValue(notification->GetValueID());
+				if (!val) {
 					Log::Write(LogLevel_Info, notification->GetNodeId(), "Dropping Notification as ValueID does not exist");
 					nit = m_notifications.begin();
 					delete notification;
+					val->Release();
 					continue;
 				}
 				break;
+			}
 			default:
 				break;
 		}

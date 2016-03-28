@@ -22,6 +22,9 @@
     <Filter Include="HIDAPI">
       <UniqueIdentifier>{e7067898-f602-4a8b-af4b-8bcedcd0d0c0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="AES">
+      <UniqueIdentifier>{c511568c-3f02-4010-b603-90e65d6caad2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\tinyxml\tinystr.h">
@@ -55,6 +58,9 @@
       <Filter>Command Classes</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\command_classes\Clock.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\Color.h">
       <Filter>Command Classes</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\command_classes\CommandClass.h">
@@ -243,6 +249,9 @@
     <ClInclude Include="..\..\..\src\Options.h">
       <Filter>Main</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\ZWSecurity.h">
+      <Filter>Main</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Utils.h">
       <Filter>Main</Filter>
     </ClInclude>
@@ -300,10 +309,46 @@
     <ClInclude Include="..\..\..\src\command_classes\UserCode.h">
       <Filter>Command Classes</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\ZWavePlusInfo.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\value_classes\ValueRaw.h">
       <Filter>Value Classes</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\command_classes\UserCode.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\aes\brg_types.h">
+      <Filter>AES</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\aes\aes.h">
+      <Filter>AES</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\aes\aesopt.h">
+      <Filter>AES</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\aes\aestab.h">
+      <Filter>AES</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\aes\brg_endian.h">
+      <Filter>AES</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\Security.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\CentralScene.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\TimeParameters.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\DeviceResetLocally.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\DoorLock.h">
+      <Filter>Command Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\command_classes\DoorLockLogging.h">
       <Filter>Command Classes</Filter>
     </ClInclude>
   </ItemGroup>
@@ -321,6 +366,9 @@
       <Filter>Main</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Node.cpp">
+      <Filter>Main</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Notification.cpp">
       <Filter>Main</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\platform\Event.cpp">
@@ -417,6 +465,9 @@
       <Filter>Command Classes</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\command_classes\Clock.cpp">
+      <Filter>Command Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\Color.cpp">
       <Filter>Command Classes</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\command_classes\CommandClass.cpp">
@@ -530,6 +581,9 @@
     <ClCompile Include="..\..\..\src\Options.cpp">
       <Filter>Main</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\ZWSecurity.cpp">
+      <Filter>Main</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Utils.cpp">
       <Filter>Main</Filter>
     </ClCompile>
@@ -584,8 +638,41 @@
     <ClCompile Include="..\..\..\src\command_classes\UserCode.cpp">
       <Filter>Command Classes</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\ZWavePlusInfo.cpp">
+      <Filter>Command Classes</Filter>
+    </ClCompile>
     <ClCompile Include="..\winversion.cpp">
       <Filter>Main</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\aes\aes_modes.c">
+      <Filter>AES</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\aes\aescrypt.c">
+      <Filter>AES</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\aes\aeskey.c">
+      <Filter>AES</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\aes\aestab.c">
+      <Filter>AES</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\DeviceResetLocally.cpp">
+      <Filter>Command Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\DoorLock.cpp">
+      <Filter>Command Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\DoorLockLogging.cpp">
+      <Filter>Command Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\Security.cpp">
+      <Filter>Command Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\CentralScene.cpp">
+      <Filter>Command Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\command_classes\TimeParameters.cpp">
+      <Filter>Command Classes</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

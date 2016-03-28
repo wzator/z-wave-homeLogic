@@ -1,7 +1,7 @@
 #The Major Version Number
 VERSION_MAJ	?= 1
 #The Minor Version Number
-VERSION_MIN ?= 0
+VERSION_MIN ?= 4
 
 #the build type we are making (release or debug)
 BUILD	?= release
@@ -9,12 +9,12 @@ BUILD	?= release
 PREFIX	?= /usr/local
 
 
-#The Location of the svnversion command for determining the repository version
-SVNVERSION := $(shell which svnversion)
 #the System we are building on
 UNAME  := $(shell uname -s)
 #the location of Doxygen to generate our api documentation
 DOXYGEN := $(shell which doxygen)
+#dot is required for doxygen (part of Graphviz)
+DOT := $(shell which dot)
 #the machine type we are building on (i686 or x86_64)
 MACHINE := $(shell uname -m)
 #the location of xmllink for checking our config files
@@ -24,12 +24,18 @@ TMP     := /tmp
 #pkg-config binary for package config files
 PKGCONFIG := $(shell which pkg-config)
 #svn binary for doing a make dist export
-SVN		:= $(shell which svn)
+GIT		:= $(shell which git)
 # if svnversion is not installed, then set the revision to 0
-ifeq ($(SVNVERSION),)
+ifeq ($(GIT),)
 VERSION_REV ?= 0
 else
-VERSION_REV ?= $(shell $(SVNVERSION) $(top_srcdir)|awk -F'[^0-9]*' '$$0=$$1')
+GITVERSION	:= $(shell $(GIT) describe --long --tags --dirty 2>/dev/null | sed s/^v//)
+ifeq ($(GITVERSION),)
+GITVERSION	:= $(VERSION_MAJ).$(VERSION_MIN).-1
+VERSION_REV	:= 0
+else
+VERSION_REV 	?= $(shell echo $(GITVERSION) | awk '{split($$0,a,"-"); print a[2]}')
+endif
 endif
 ifeq ($(VERSION_REV),)
 VERSION_REV ?= 0
@@ -38,9 +44,16 @@ endif
 VERSION := $(VERSION_MAJ).$(VERSION_MIN)
 
 # support Cross Compiling options
+ifeq ($(UNAME),FreeBSD)
+# Actually hide behind c++ which works for both clang based 10.0 and earlier(?)
+CC     := $(CROSS_COMPILE)cc
+CXX    := $(CROSS_COMPILE)c++
+LD     := $(CROSS_COMPILE)c++
+else
 CC     := $(CROSS_COMPILE)gcc
 CXX    := $(CROSS_COMPILE)g++
 LD     := $(CROSS_COMPILE)g++
+endif
 ifeq ($(UNAME),Darwin)
 AR     := libtool -static -o 
 RANLIB := ranlib
@@ -76,6 +89,13 @@ else
 instlibdir ?= $(PREFIX)$(instlibdir.default)
 endif
 
+#pkg-config doesn't exist, lets try to guess best place to put the pc file
+ifeq ($(PKGCONFIG),)
+pkgconfigdir ?= $(shell if [ -d "/usr/lib64/pkgconfig" ]; then echo "/usr/lib64/pkgconfig"; else echo "/usr/lib/pkgconfig"; fi)
+else
+pkgconfigdir ?= $(shell pkg-config --variable pc_path pkg-config | awk '{split($$0,a,":"); print a[1]}')
+endif
+
 sysconfdir ?= $(PREFIX)/etc/openzwave/
 includedir ?= $(PREFIX)/include/openzwave/
 docdir ?= $(PREFIX)/share/doc/openzwave-$(VERSION).$(VERSION_REV)
@@ -91,23 +111,25 @@ DEPDIR = $(top_builddir)/.dep
 
 $(OBJDIR)/%.o : %.cpp
 	@echo "Building $(notdir $@)"
-	@$(CXX) $(CFLAGS) $(INCLUDES) -o $@ $<
+	@$(CXX) -MM $(CFLAGS) $(INCLUDES) $< > $(DEPDIR)/$*.d
+	@mv -f $(DEPDIR)/$*.d $(DEPDIR)/$*.d.tmp
+	@$(SED) -e 's|.*:|$(OBJDIR)/$*.o: $(DEPDIR)/$*.d|' < $(DEPDIR)/$*.d.tmp > $(DEPDIR)/$*.d;
+	@$(SED) -e 's/.*://' -e 's/\\$$//' < $(DEPDIR)/$*.d.tmp | fmt -1 | \
+	  $(SED) -e 's/^ *//' -e 's/$$/:/' >> $(DEPDIR)/.$*.d;
+	@rm -f $(DEPDIR)/$*.d.tmp
+	@$(CXX) $(CFLAGS) $(TARCH) $(INCLUDES) -o $@ $<
+
 
 $(OBJDIR)/%.o : %.c
 	@echo "Building $(notdir $@)"	
-	@$(CC) $(CFLAGS) $(INCLUDES) -o $@ $<
+	@$(CC) -MM $(CFLAGS) $(INCLUDES) $< > $(DEPDIR)/$*.d
+	@mv -f $(DEPDIR)/$*.d $(DEPDIR)/$*.d.tmp
+	@$(SED) -e 's|.*:|$(OBJDIR)/$*.o: $(DEPDIR)/$*.d|' < $(DEPDIR)/$*.d.tmp > $(DEPDIR)/$*.d;
+	@$(SED) -e 's/.*://' -e 's/\\$$//' < $(DEPDIR)/$*.d.tmp | fmt -1 | \
+	  $(SED) -e 's/^ *//' -e 's/$$/:/' >> $(DEPDIR)/.$*.d;
+	@rm -f $(DEPDIR)/$*.d.tmp
+	@$(CC) $(CFLAGS) $(TARCH) $(INCLUDES) -o $@ $<
 
-$(DEPDIR)/%.d : %.cpp
-	@set -e; rm -f $@; \
-	$(CXX) -MM $(INCLUDES) $< > $@.$$$$; \
-	$(SED) 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
-
-$(DEPDIR)/%.d : %.c
-	@set -e; rm -f $@; \
-	$(CXX) -MM $(INCLUDES) $< > $@.$$$$; \
-	$(SED) 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
 
 dummy := $(shell test -d $(OBJDIR) || mkdir -p $(OBJDIR))
 dummy := $(shell test -d $(DEPDIR) || mkdir -p $(DEPDIR))

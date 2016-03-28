@@ -35,16 +35,27 @@ endif
 #if we are on a Mac, add these flags and libs to the compile and link phases 
 ifeq ($(UNAME),Darwin)
 CFLAGS	+= -c -DDARWIN
-ARCH	+= -arch i386 -arch x86_64
+TARCH	+= -arch i386 -arch x86_64
 LDFLAGS += -dynamiclib
 LIBS	+= -framework IOKit -framework CoreFoundation -arch i386 -arch x86_64
 else ifeq ($(UNAME),FreeBSD)
-
-# FreeBSD 10 has native iconv.h; for older, we look in /usr/local, and libiconv must be installed from ports.
-ifeq (,$(wildcard /usr/include/iconv.h))
-CFLAGS += -I/usr/local/include
-endif
 LDFLAGS+= -shared -lusb
+
+# Pre FreeBSD 10.2 we have no native, or "old" native iconv.h (non-posix compliant
+# const modifiers)
+# For these, require libiconv pkg to be installed.
+ifeq ($(shell test $$(uname -U) -ge 1002000; echo $$?),1)
+# <10.2
+ifeq (,$(wildcard /usr/local/include/iconv.h))
+$(error FreeBSD pre 10.2: Please install libiconv from ports)
+else
+# Installed, use it
+CFLAGS += -I/usr/local/include
+# User application *must* use -liconv; we don't do any linking from this file since we only
+# build a library.
+endif
+endif
+# For 10.2 and later, use iconv from base, no extra include path required.
 
 else
 LDFLAGS += -shared -Wl,-soname,libopenzwave.so.$(VERSION)
@@ -140,7 +151,7 @@ $(LIBDIR)/$(SHARED_LIB_NAME):	$(patsubst %.cpp,$(OBJDIR)/%.o,$(tinyxml)) \
 			$(patsubst %.cpp,$(OBJDIR)/%.o,$(indep)) \
 			$(OBJDIR)/vers.o
 	@echo "Linking Shared Library"
-	@$(LD) $(LDFLAGS) $(ARCH) -o $@ $+ $(LIBS)
+	@$(LD) $(LDFLAGS) $(TARCH) -o $@ $+ $(LIBS)
 	@ln -sf $(SHARED_LIB_NAME) $(LIBDIR)/$(SHARED_LIB_UNVERSIONED)
 
 $(top_builddir)/libopenzwave.pc: $(top_srcdir)/cpp/build/libopenzwave.pc.in $(PKGCONFIG)
