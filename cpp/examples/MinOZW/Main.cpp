@@ -1,11 +1,11 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20151011
+//	Main.cpp v0.20160507
 //
 //	Based on minimal application to test OpenZWave.
 //
 //
-//	Copyright (c) 2013-2015 Wojciech Zatorski <wojciech@zatorski.net>
+//	Copyright (c) 2013-2016 Wojciech Zatorski <wojciech@zatorski.net>
 //
 //
 //	OpenZWave SOFTWARE NOTICE AND LICENSE
@@ -550,7 +550,7 @@ int RPC_LoadSMS(GSM_StateMachine *s)
 			sprintf(query,"UPDATE parameters SET parValue = 0 WHERE parName = 'alarmOn' LIMIT 1");
 			mysql_query(&mysql,query);
 
-			int lastid = mysql_insert_id(&mysql);
+			int lastid = mysql_affected_rows(&mysql);
 
 		        pthread_mutex_unlock(&g_criticalSection);
 
