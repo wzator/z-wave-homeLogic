@@ -531,7 +531,7 @@ int RPC_LoadSMS(GSM_StateMachine *s)
 			sprintf(query,"UPDATE parameters SET parValue = 1 WHERE parName = 'alarmOn' LIMIT 1");
 			mysql_query(&mysql,query);
 
-			int lastid = mysql_insert_id(&mysql);
+			int lastid = mysql_affected_rows(&mysql);
 
 		        pthread_mutex_unlock(&g_criticalSection);
 
