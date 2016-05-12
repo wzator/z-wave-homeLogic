@@ -3593,6 +3593,19 @@ printf("Going ...\n");
 		    }
 		}
 
+		if (trim(data.substr(0,4).c_str()) == "KILL")
+		{
+		    string tmp = data.substr(4,data.length()-4);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int mynode = strtol(tmp.c_str(),&garbage,0);
+			if (mynode > 0) {
+			    Manager::Get()->RemoveFailedNode( g_homeId, mynode );
+			    new_sock << dataOK;
+			}
+		    }
+		}
 
 		if (trim(data.substr(0,7).c_str()) == "REFRESH")
 		{
