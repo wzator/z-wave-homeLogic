@@ -3125,7 +3125,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	if (alarmOn == 0)
 	{
 	    mysql_free_result(result);
-	    sprintf(query,"SELECT ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1)");
+	    sprintf(query,"SELECT IFNULL(ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60),0) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1)");
     	    mysql_query(&mysql,query);
 	    result = mysql_store_result(&mysql);
 	    num_rows = mysql_num_rows(result);
