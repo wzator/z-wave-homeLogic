@@ -1799,7 +1799,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 /* **************** */
 
 	/* for alarms when 255 is returned */
-	if (value == 255)
+	if (value == 255 || value == 99)
 	{
 	    zones_validate(nodeID,homeID);
 	    printf(_("Zones validate for node %d"),nodeID);
@@ -3125,7 +3125,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	if (alarmOn == 0)
 	{
 	    mysql_free_result(result);
-	    sprintf(query,"SELECT IFNULL(ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60),0) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1)");
+	    sprintf(query,"SELECT IFNULL(ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60),0) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1) AND b1.homeid = %d", g_homeId);
     	    mysql_query(&mysql,query);
 	    result = mysql_store_result(&mysql);
 	    num_rows = mysql_num_rows(result);
@@ -3138,7 +3138,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	    printf("onState: %d\n",atoi(row[0]));
 		if ((atoi(row[0]) > 20 && atoi(row[0]) < 23))
 		{
-		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.onState > DATE_ADD(b1.onState, INTERVAL 30 SECOND) OR b2.offState > DATE_ADD(b2.offState, INTERVAL 30 SECOND)) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1)");
+		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.homeid = %d AND (b2.onState > DATE_ADD(b1.onState, INTERVAL 30 SECOND) OR b2.offState > DATE_ADD(b2.offState, INTERVAL 30 SECOND))) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %d) AND homeid = %d", g_homeId, g_homeId, g_homeId);
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
 		    num_rows = mysql_num_rows(result);
@@ -3178,7 +3178,7 @@ printf("parValue: %d\n",atoi(row[0]));
 
 	    // check nodes
 
-		    sprintf(query,"SELECT COUNT(nodeid) FROM basicLastState WHERE onState < NOW() AND onState > DATE_SUB(NOW(), INTERVAL 15 MINUTE) AND nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1) ");
+		    sprintf(query,"SELECT COUNT(nodeid) FROM basicLastState WHERE homeid = %d AND onState < NOW() AND onState > DATE_SUB(NOW(), INTERVAL 15 MINUTE) AND nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %d) ", g_homeId, g_homeId);
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
 		    num_rows = mysql_num_rows(result);
@@ -3414,10 +3414,17 @@ printf("Going ...\n");
         // Start timer
         makeTimer((char *)"ACTIONS", &firstTimerID, 60, 60);
 
+	int stopnow = 0;
+
         try {
             // Create the socket
             ServerSocket server(6004);
             while (true) {
+
+		if (stopnow == 1)
+		{
+		    break;
+		}
 
                 //pthread_mutex_lock(&g_criticalSection);
                 // Do stuff            
@@ -3576,6 +3583,12 @@ printf("Going ...\n");
 				new_sock << dataOK;
 			}
 		    }
+		}
+
+		if (trim(data.substr(0,5).c_str()) == "RESET")
+		{
+		    stopnow = 1;
+		    break;
 		}
 
 		if (trim(data.substr(0,8).c_str()) == "TESTNODE")
