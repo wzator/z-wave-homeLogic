@@ -3125,7 +3125,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	if (alarmOn == 0)
 	{
 	    mysql_free_result(result);
-	    sprintf(query,"SELECT IFNULL(ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60),0) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1) AND b1.homeid = %d", g_homeId);
+	    sprintf(query,"SELECT IFNULL(ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60),0) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1 AND nodes.homeid = %d) AND b1.homeid = %d", g_homeId, g_homeId);
     	    mysql_query(&mysql,query);
 	    result = mysql_store_result(&mysql);
 	    num_rows = mysql_num_rows(result);
@@ -3138,7 +3138,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	    printf("onState: %d\n",atoi(row[0]));
 		if ((atoi(row[0]) > 20 && atoi(row[0]) < 23))
 		{
-		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.homeid = %d AND (b2.onState > DATE_ADD(b1.onState, INTERVAL 30 SECOND) OR b2.offState > DATE_ADD(b2.offState, INTERVAL 30 SECOND))) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %d) AND homeid = %d", g_homeId, g_homeId, g_homeId);
+		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.homeid = %d AND (b2.onState > DATE_ADD(b1.onState, INTERVAL 30 SECOND) OR b2.offState > DATE_ADD(b2.offState, INTERVAL 30 SECOND))) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1 AND nodes.homeid = %d) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %d) AND b1.homeid = %d", g_homeId, g_homeId, g_homeId, g_homeId);
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
 		    num_rows = mysql_num_rows(result);
