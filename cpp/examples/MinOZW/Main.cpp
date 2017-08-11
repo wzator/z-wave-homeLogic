@@ -2235,6 +2235,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 	    // FLOOD
 
+	    // flood off value: 0
 	    if (strcmp(label.c_str(),"Flood") == 0 && strcmp(dev_value,"0") == 0 && alarmstatus == 1)
 	    {
 
@@ -2243,7 +2244,8 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
     	        alarmstatus = 0;
 	    }
 
-	    if (strcmp(label.c_str(),"Flood") == 0 && strcmp(dev_value,"255") == 0)
+	    // Flood On value: 255, 254, 2
+	    if (strcmp(label.c_str(),"Flood") == 0 && (strcmp(dev_value,"255") == 0 || strcmp(dev_value,"2") == 0 || strcmp(dev_value,"254") == 0))
 	    {
 		char info[4096];
 		time_t rawtime;
