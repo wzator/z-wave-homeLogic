@@ -72,6 +72,9 @@
 #include <libintl.h>
 #include <curl/curl.h>
 
+#include "MQTTClient.h"
+#include <json.h>
+
 #define PACKETSIZE  64
 #define _(String) gettext (String)
 
@@ -80,6 +83,8 @@ using namespace OpenZWave;
 static uint32 g_homeId = 0;
 static bool g_initFailed = false;
 static bool g_initStatus = true; /* initialising status - don't write notifications */
+
+volatile MQTTClient_deliveryToken deliveredtoken;
 
 int alarmstatus = 0;
 
@@ -99,6 +104,8 @@ typedef struct {
 
 struct config_type
 {
+	char   mqtt_address[64];
+        char   mqtt_clientid[64];
 	char   mysql_host[50];             //Either localhost, IP address or hostname
 	char   mysql_user[25];
 	char   mysql_passwd[25];
@@ -1935,6 +1942,8 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 	sprintf(query, "%s,YEAR(NOW()))",query);
 
+	printf("QUERY:%s\n", query);
+
 	if (g_initStatus == false)
 	{
     	    if(mysql_query(&mysql, query))
@@ -2558,6 +2567,18 @@ int get_configuration(struct config_type *config, char *path)
 
 		if (token[0] == '#')	// comment
 			continue;
+
+		if ((strcmp(token,"MQTT_ADDRESS") == 0) && (strlen(val) != 0))
+		{
+			strcpy(config->mqtt_address, val);
+			continue;
+		}
+
+		if ((strcmp(token,"MQTT_CLIENTID") == 0) && (strlen(val) != 0))
+		{
+			strcpy(config->mqtt_clientid, val);
+			continue;
+		}
 
 		if ((strcmp(token,"MYSQL_HOST") == 0) && (strlen(val) != 0))
 		{
@@ -3262,6 +3283,64 @@ static int makeTimer(char *name, timer_t *timerID, int expireMS, int intervalMS 
 }
 
 
+// MQTT
+// --------------------------
+void delivered(void *context, MQTTClient_deliveryToken dt)
+{
+    printf("Message with token value %d delivery confirmed\n", dt);
+    deliveredtoken = dt;
+}
+
+struct json_object * find_json(struct json_object *jobj, const char *key) {
+    struct json_object *tmp;
+
+    json_object_object_get_ex(jobj, key, &tmp);
+
+    return tmp;
+}
+
+int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *message)
+{
+    struct json_object *jobj;
+    char query[4096];
+    char topic[4096];
+    char content[4096];
+    MYSQL_RES *result;
+    int num_rows;
+    MYSQL_ROW row;
+
+    pthread_mutex_lock(&g_criticalSection);
+
+    jobj = json_tokener_parse((const char *)message->payload);
+    //printf("VALUE: %s\n", json_object_get_string(find_json(jobj, "battery")));
+
+    mysql_real_escape_string(&mysql, topic, topicName, topicLen);
+    mysql_real_escape_string(&mysql, content, (const char *) message->payload, message->payloadlen);
+
+    sprintf(query, "INSERT INTO notificationsZigBee (topic, message, ctime) VALUES ('%s','%s',NOW())", 
+	    topic, content
+    );
+
+    if(mysql_query(&mysql, query))
+    {
+        fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+    }
+
+    MQTTClient_freeMessage(&message);
+    MQTTClient_free(topicName);
+
+    pthread_mutex_unlock(&g_criticalSection);
+
+    return 1;
+}
+
+void connlost(void *context, char *cause)
+{
+    printf("\nConnection lost\n");
+    printf("     cause: %s\n", cause);
+}
+
+// --------------------------
 
 //-----------------------------------------------------------------------------
 // <main>
@@ -3271,6 +3350,14 @@ static int makeTimer(char *name, timer_t *timerID, int expireMS, int intervalMS 
 int main(int argc, char* argv[]) {
     pthread_mutexattr_t mutexattr;
     pthread_mutexattr_t mutexattrSMS;
+    MQTTClient client;
+    MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
+    int rc;
+    int ch;
+    char query[4096];
+    MYSQL_RES *result;
+    int num_rows;
+    MYSQL_ROW row;
 
     int forked = fork();
 
@@ -3340,6 +3427,40 @@ int main(int argc, char* argv[]) {
 
     pthread_mutex_lock(&initMutex);
 
+    printf("Initializing ZigBee MQTT gateway\n");
+
+    MQTTClient_create(&client, config.mqtt_address, config.mqtt_clientid,
+        MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    conn_opts.keepAliveInterval = 20;
+    conn_opts.cleansession = 1;
+
+    MQTTClient_setCallbacks(client, NULL, connlost, msgarrvd, delivered);
+
+    if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS)
+    {
+        printf("Failed to connect, return code %d\n", rc);
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+	    sprintf(query,"SELECT topic FROM nodesZigBee");
+	    mysql_query(&mysql,query);
+	    result = mysql_store_result(&mysql);
+	    num_rows = mysql_num_rows(result);
+
+	    if (num_rows > 0)
+	    {
+		while ((row = mysql_fetch_row(result)))
+	        {
+		    printf("Subscribing to topic %s\n", row[0]);
+		    MQTTClient_subscribe(client, row[0], 1);
+		}
+	    }
+
+	    mysql_free_result(result);
+    }
+
+    printf("Initializing OpenZWave ...\n");
 
     // Create the OpenZWave Manager.
     // The first argument is the path to the config files (where the manufacturer_specific.xml file is located
@@ -3992,5 +4113,29 @@ printf("Going ...\n");
     Options::Destroy();
     pthread_mutex_destroy(&g_criticalSection);
     pthread_mutex_destroy(&g_criticalSectionSMS);
+
+
+    if (rc == MQTTCLIENT_SUCCESS)
+    {
+	sprintf(query,"SELECT topic FROM nodesZigBee");
+	mysql_query(&mysql,query);
+	result = mysql_store_result(&mysql);
+	num_rows = mysql_num_rows(result);
+
+	if (num_rows > 0)
+	{
+	    while ((row = mysql_fetch_row(result)))
+	    {
+		    printf("Unsubscribing to topic %s\n", row[0]);
+	            MQTTClient_unsubscribe(client, row[0]);
+	    }
+	}
+
+	mysql_free_result(result);
+
+	MQTTClient_disconnect(client, 10000);
+        MQTTClient_destroy(&client);
+    }
+
     return 0;
 }
