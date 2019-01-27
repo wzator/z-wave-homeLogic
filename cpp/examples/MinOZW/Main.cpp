@@ -146,11 +146,11 @@ struct config_type
 
 // WASHER variables
 float  washer_status		= 0;
-int    washer_offcounter	= 0;
+int    washer_offcounter	= -1;
 struct tm washer_timestart;
 
 float  dishwasher_status	= 0;
-int    dishwasher_offcounter	= 0;
+int    dishwasher_offcounter	= -1;
 struct tm dishwasher_timestart;
 
 // globals
@@ -3304,21 +3304,40 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
     struct json_object *jobj;
     char query[4096];
     char topic[4096];
+    char mykey[4096];
+    char myvalue[4096];
+    char mystring[4096];
     char content[4096];
     MYSQL_RES *result;
-    int num_rows;
-    MYSQL_ROW row;
 
     pthread_mutex_lock(&g_criticalSection);
 
-    jobj = json_tokener_parse((const char *)message->payload);
-    //printf("VALUE: %s\n", json_object_get_string(find_json(jobj, "battery")));
-
-    mysql_real_escape_string(&mysql, topic, topicName, topicLen);
+    mysql_real_escape_string(&mysql, topic, topicName, strlen(topicName));
     mysql_real_escape_string(&mysql, content, (const char *) message->payload, message->payloadlen);
 
+    jobj = json_tokener_parse((const char *)message->payload);
+
+    if (jobj)
+    {
+	json_object_object_foreach(jobj, key, val) 
+        {
+	    sprintf(mystring, "%s", json_object_get_string(val));
+	    mysql_real_escape_string(&mysql, mykey, key, strlen(key));
+	    mysql_real_escape_string(&mysql, myvalue, mystring, strlen(mystring));
+
+	    sprintf(query, "INSERT INTO notificationsZigBeeByParam (topic, `name`, `value`, ctime) VALUES ('%s','%s','%s', NOW())", 
+		topic, mykey, myvalue
+	    );
+
+	    if(mysql_query(&mysql, query))
+	    {
+		fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+	    }
+	}
+    }
+
     sprintf(query, "INSERT INTO notificationsZigBee (topic, message, ctime) VALUES ('%s','%s',NOW())", 
-	    topic, content
+        topic, content
     );
 
     if(mysql_query(&mysql, query))
@@ -3353,7 +3372,6 @@ int main(int argc, char* argv[]) {
     MQTTClient client;
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     int rc;
-    int ch;
     char query[4096];
     MYSQL_RES *result;
     int num_rows;
@@ -3363,13 +3381,6 @@ int main(int argc, char* argv[]) {
 
     if (forked != 0)
 	return 0;
-
-	washer_status		= 0;
-	washer_offcounter	= -1;
-	
-	dishwasher_status	= 0;
-	dishwasher_offcounter	= -1;
-
 
     setlocale(LC_ALL,"MinOZW");
     bindtextdomain("","/usr/share/locale");
@@ -4010,7 +4021,7 @@ printf("Going ...\n");
                                     device += "DEVICE~" + ssNodeName.str() + "~" + ssNodeId.str() + "~"+ ssNodeZone.str() +"~" + ssNodeType.str() + "#";
                                 }
                             }
-                            device = device.substr(0, device.size() - 1) + "\n";                           
+                            device = device.substr(0, device.size() - 1) + "\n";
                             printf("Sent Device List \n");
                             new_sock << device;
                         }
@@ -4025,7 +4036,7 @@ printf("Going ...\n");
                             stringstream sCommand;
                             sCommand << v[0].c_str();
                             string command = sCommand.str();
-                            
+
                             printf("Command: %s", command.c_str());
                             if (command == "DEVICE") {
                                 //check type
