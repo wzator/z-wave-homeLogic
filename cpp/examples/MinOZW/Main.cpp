@@ -1,11 +1,11 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20160507
+//	Main.cpp v0.20190127
 //
 //	Based on minimal application to test OpenZWave.
 //
 //
-//	Copyright (c) 2013-2016 Wojciech Zatorski <wojciech@zatorski.net>
+//	Copyright (c) 2013-2019 Wojciech Zatorski <wojciech@zatorski.net>
 //
 //
 //	OpenZWave SOFTWARE NOTICE AND LICENSE
@@ -71,7 +71,7 @@
 #include <locale.h>
 #include <libintl.h>
 #include <curl/curl.h>
-
+#include "core/MQTT.h"
 #include "MQTTClient.h"
 #include <json.h>
 
@@ -85,9 +85,11 @@ static bool g_initFailed = false;
 static bool g_initStatus = true; /* initialising status - don't write notifications */
 
 volatile MQTTClient_deliveryToken deliveredtoken;
+MQTTClient client;
+MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
+int rc;
 
 int alarmstatus = 0;
-
 
 struct packet
 {
@@ -3357,7 +3359,55 @@ void connlost(void *context, char *cause)
 {
     printf("\nConnection lost\n");
     printf("     cause: %s\n", cause);
+    
+    pthread_mutex_lock(&g_criticalSection);
+    mqtt_connect();
+    pthread_mutex_unlock(&g_criticalSection);
 }
+
+void mqtt_connect()
+{
+    char query[4096];
+    MYSQL_RES *result;
+    int num_rows;
+    MYSQL_ROW row;
+
+    printf("Initializing ZigBee MQTT gateway\n");
+
+    MQTTClient_create(&client, config.mqtt_address, config.mqtt_clientid,
+        MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    conn_opts.keepAliveInterval = 20;
+    conn_opts.cleansession = 1;
+
+    MQTTClient_setCallbacks(client, NULL, connlost, msgarrvd, delivered);
+
+    if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS)
+    {
+        printf("Failed to connect, return code %d\n", rc);
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+	    sprintf(query,"SELECT topic FROM nodesZigBee");
+	    mysql_query(&mysql,query);
+	    result = mysql_store_result(&mysql);
+	    num_rows = mysql_num_rows(result);
+
+	    if (num_rows > 0)
+	    {
+		while ((row = mysql_fetch_row(result)))
+	        {
+		    printf("Subscribing to topic %s\n", row[0]);
+		    MQTTClient_subscribe(client, row[0], 1);
+		}
+	    }
+
+	    mysql_free_result(result);
+    }
+
+}
+
+
 
 // --------------------------
 
@@ -3369,9 +3419,6 @@ void connlost(void *context, char *cause)
 int main(int argc, char* argv[]) {
     pthread_mutexattr_t mutexattr;
     pthread_mutexattr_t mutexattrSMS;
-    MQTTClient client;
-    MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-    int rc;
     char query[4096];
     MYSQL_RES *result;
     int num_rows;
@@ -3438,38 +3485,7 @@ int main(int argc, char* argv[]) {
 
     pthread_mutex_lock(&initMutex);
 
-    printf("Initializing ZigBee MQTT gateway\n");
-
-    MQTTClient_create(&client, config.mqtt_address, config.mqtt_clientid,
-        MQTTCLIENT_PERSISTENCE_NONE, NULL);
-    conn_opts.keepAliveInterval = 20;
-    conn_opts.cleansession = 1;
-
-    MQTTClient_setCallbacks(client, NULL, connlost, msgarrvd, delivered);
-
-    if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS)
-    {
-        printf("Failed to connect, return code %d\n", rc);
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-	    sprintf(query,"SELECT topic FROM nodesZigBee");
-	    mysql_query(&mysql,query);
-	    result = mysql_store_result(&mysql);
-	    num_rows = mysql_num_rows(result);
-
-	    if (num_rows > 0)
-	    {
-		while ((row = mysql_fetch_row(result)))
-	        {
-		    printf("Subscribing to topic %s\n", row[0]);
-		    MQTTClient_subscribe(client, row[0], 1);
-		}
-	    }
-
-	    mysql_free_result(result);
-    }
+    mqtt_connect();
 
     printf("Initializing OpenZWave ...\n");
 
