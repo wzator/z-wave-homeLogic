@@ -36,39 +36,57 @@ class TiXmlElement;
 
 namespace OpenZWave
 {
-	class Msg;
-	class Node;
-	class CommandClass;
-
-	/** \brief Boolean value sent to/received from a node.
-	 */
-	class ValueBool: public Value
+	namespace Internal
 	{
-	public:
-		ValueBool( uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint8 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, bool const _value, uint8 const _pollIntensity );
-		ValueBool(){}
-		virtual ~ValueBool(){}
+		namespace VC
+		{
 
-		bool Set( bool const _value );
-		void OnValueRefreshed( bool const _value );
+			/** \brief Boolean value sent to/received from a node.
+			 * \ingroup ValueID
+			 */
+			class ValueBool: public Value
+			{
+				public:
+					ValueBool(uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint16 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, bool const _value, uint8 const _pollIntensity);
+					ValueBool()
+					{
+					}
+					virtual ~ValueBool()
+					{
+					}
 
-		// From Value
-		virtual string const GetAsString() const { return ( GetValue() ? "True" : "False" ); }
-		virtual bool SetFromString( string const& _value );
-		virtual void ReadXML( uint32 const _homeId, uint8 const _nodeId, uint8 const _commandClassId, TiXmlElement const* _valueElement );
-		virtual void WriteXML( TiXmlElement* _valueElement );
+					bool Set(bool const _value);
+					void OnValueRefreshed(bool const _value);
+					void ConfirmNewValue()
+					{
+						OnValueRefreshed(m_newValue != 0);
+					};
+					void SetTargetValue(bool const _target, uint32 _duration = 0);
 
-		bool GetValue()const{ return m_value; }
 
-	private:
-		bool	m_value;				// the current index in the m_items vector
-		bool	m_valueCheck;			// the previous value (used for double-checking spurious value reads)
-		bool	m_newValue;				// a new value to be set on the appropriate device
-	};
+					// From Value
+					virtual string const GetAsString() const
+					{
+						return (GetValue() ? "True" : "False");
+					}
+					virtual bool SetFromString(string const& _value);
+					virtual void ReadXML(uint32 const _homeId, uint8 const _nodeId, uint8 const _commandClassId, TiXmlElement const* _valueElement);
+					virtual void WriteXML(TiXmlElement* _valueElement);
 
+					bool GetValue() const
+					{
+						return m_value;
+					}
+
+				private:
+					bool m_value;				// the current index in the m_items vector
+					bool m_valueCheck;			// the previous value (used for double-checking spurious value reads)
+					bool m_targetValue;			// The Target Value
+					bool m_newValue;			// a new value to be set on the appropriate device (used by Supervision CC)
+			};
+		} // namespace VC
+	} // namespace Internal
 } // namespace OpenZWave
 
 #endif
-
-
 

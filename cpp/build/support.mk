@@ -1,7 +1,7 @@
 #The Major Version Number
 VERSION_MAJ	?= 1
 #The Minor Version Number
-VERSION_MIN ?= 4
+VERSION_MIN ?= 3
 
 #the build type we are making (release or debug)
 BUILD	?= release
@@ -89,13 +89,6 @@ else
 instlibdir ?= $(PREFIX)$(instlibdir.default)
 endif
 
-#pkg-config doesn't exist, lets try to guess best place to put the pc file
-ifeq ($(PKGCONFIG),)
-pkgconfigdir ?= $(shell if [ -d "/usr/lib64/pkgconfig" ]; then echo "/usr/lib64/pkgconfig"; else echo "/usr/lib/pkgconfig"; fi)
-else
-pkgconfigdir ?= $(shell pkg-config --variable pc_path pkg-config | awk '{split($$0,a,":"); print a[1]}')
-endif
-
 sysconfdir ?= $(PREFIX)/etc/openzwave/
 includedir ?= $(PREFIX)/include/openzwave/
 docdir ?= $(PREFIX)/share/doc/openzwave-$(VERSION).$(VERSION_REV)
@@ -117,7 +110,7 @@ $(OBJDIR)/%.o : %.cpp
 	@$(SED) -e 's/.*://' -e 's/\\$$//' < $(DEPDIR)/$*.d.tmp | fmt -1 | \
 	  $(SED) -e 's/^ *//' -e 's/$$/:/' >> $(DEPDIR)/.$*.d;
 	@rm -f $(DEPDIR)/$*.d.tmp
-	@$(CXX) $(CFLAGS) $(TARCH) $(INCLUDES) -o $@ $<
+	@$(CXX) $(CFLAGS) $(ARCH) $(INCLUDES) -o $@ $<
 
 
 $(OBJDIR)/%.o : %.c
@@ -128,7 +121,7 @@ $(OBJDIR)/%.o : %.c
 	@$(SED) -e 's/.*://' -e 's/\\$$//' < $(DEPDIR)/$*.d.tmp | fmt -1 | \
 	  $(SED) -e 's/^ *//' -e 's/$$/:/' >> $(DEPDIR)/.$*.d;
 	@rm -f $(DEPDIR)/$*.d.tmp
-	@$(CC) $(CFLAGS) $(TARCH) $(INCLUDES) -o $@ $<
+	@$(CC) $(CFLAGS) $(ARCH) $(INCLUDES) -o $@ $<
 
 
 dummy := $(shell test -d $(OBJDIR) || mkdir -p $(OBJDIR))
