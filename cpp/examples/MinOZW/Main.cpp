@@ -1,11 +1,11 @@
 //-----------------------------------------------------------------------------
 //
-//	Main.cpp v0.20190127
+//	Main.cpp v0.20220707
 //
 //	Based on minimal application to test OpenZWave.
 //
 //
-//	Copyright (c) 2013-2019 Wojciech Zatorski <wojciech@zatorski.net>
+//	Copyright (c) 2013-2022 Wojciech Zatorski <wojciech@zatorski.net>
 //
 //
 //	OpenZWave SOFTWARE NOTICE AND LICENSE
@@ -56,6 +56,7 @@
 #include "gammu.h"
 #include <signal.h>
 
+
 #include <xmlrpc-c/base.h>
 #include <xmlrpc-c/client.h>
 
@@ -74,6 +75,7 @@
 #include "core/MQTT.h"
 #include "MQTTClient.h"
 #include <json.h>
+#include <telebot.h>
 
 #define PACKETSIZE  64
 #define _(String) gettext (String)
@@ -90,6 +92,8 @@ MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
 int rc;
 
 int alarmstatus = 0;
+telebot_handler_t telebot_handle;
+
 
 struct packet
 {
@@ -137,21 +141,29 @@ struct config_type
 	char   tv_start[256];
 	char   tv_off[256];
 	char   prefix[256];
+	char   mqt_washer[256];
+	char   mqt_dishwasher[256];
 	int    tv_port;
 	int    dynamic[256];
 	int    washer_node;
 	int    dishwasher_node;
 	int    sms_commands;
 	int    sms_location;
+	char   telegram_token[100];
+	long int   telegram_a1;
+	long int   telegram_a2;
+
 };
 
 
 // WASHER variables
 float  washer_status		= 0;
+float  washer_total		= 0;
 int    washer_offcounter	= -1;
 struct tm washer_timestart;
 
 float  dishwasher_status	= 0;
+float  dishwasher_total		= 0;
 int    dishwasher_offcounter	= -1;
 struct tm dishwasher_timestart;
 
@@ -1061,6 +1073,25 @@ int RPC_SSHdo(const char *command, const char *cfg_host, const char *cfg_login, 
 }
 
 
+/* Telegram *************************************************************************/
+
+//-----------------------------------------------------------------------------
+// <RPC_SendTelegram>
+// Send message to telegram client
+//-----------------------------------------------------------------------------
+
+int RPC_SendTelegram(long int number, const char *text)
+{
+    telebot_error_e ret;
+
+    ret = telebot_send_message(telebot_handle, number, text, "HTML", false, false, 0, "");
+
+    if (ret != TELEBOT_ERROR_NONE)
+    {
+        printf("Failed to send message: %d \n", ret);
+    }
+}
+
 /* GaduGadu *************************************************************************/
 
 //-----------------------------------------------------------------------------
@@ -1457,6 +1488,12 @@ void alarm(char *info)
 		if (strlen(config.gg_a2) > 0)
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
+		if (config.telegram_a1 > 0)
+			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		if (config.telegram_a2 > 0)
+			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
 		if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
 		{
 		    pthread_t sms_thread; 
@@ -1546,7 +1583,7 @@ void zones_validate(int nodeId, long int homeId)
 
     mysql_free_result(result);
 
-    sprintf(query,"SELECT id FROM zonesAction WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND DATE(zonesAction.timestamp) != DATE(NOW())",homeId,nodeId);
+    sprintf(query,"SELECT id FROM zonesAction WHERE homeid = %Ld AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) )  AND DATE(zonesAction.timestamp) != DATE(NOW())",homeId,nodeId);
     mysql_query(&mysql,query);
     result = mysql_store_result(&mysql);
 
@@ -1585,7 +1622,7 @@ void RPC_WakeUp( int homeID, int nodeID, Notification const* _notification )
 	char query[4096];
 
         sprintf(query, "INSERT INTO wakeup (homeid,node) VALUES (");
-	sprintf(query, "%s%d,%d",query,homeID,nodeID);
+	sprintf(query, "%s%Ld,%d",query,homeID,nodeID);
 
 	sprintf(query, "%s)",query);
 
@@ -1674,7 +1711,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 		instanceID = 1;
 	}
 
-	printf(_("BASIC_CLASS: HomeId=%d Node=%d Value=%d\n"), homeID, nodeID, value );
+	printf(_("BASIC_CLASS: HomeId=%Ld Node=%d Value=%d\n"), homeID, nodeID, value );
 
 	snprintf( dev_value, 1024, "%d", value );
 
@@ -1686,9 +1723,9 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
         sprintf(query, "INSERT INTO basic (homeid,node,instance,valueINT,parentId) VALUES (");
 
 	if (value == 0)
-	    sprintf(query, "%s%d,%d,%d,\'%s\',(SELECT MAX(id) FROM basic AS b WHERE node = %d AND valueINT > 0 AND homeid = %d)",query,homeID,nodeID,instanceID,dev_value,nodeID, homeID);
+	    sprintf(query, "%s%Ld,%d,%d,\'%s\',(SELECT MAX(id) FROM basic AS b WHERE node = %d AND valueINT > 0 AND homeid = %Ld)",query,homeID,nodeID,instanceID,dev_value,nodeID, homeID);
 	else
-	    sprintf(query, "%s%d,%d,%d,\'%s\',NULL",query,homeID,nodeID,instanceID,dev_value);
+	    sprintf(query, "%s%Ld,%d,%d,\'%s\',NULL",query,homeID,nodeID,instanceID,dev_value);
 
 	sprintf(query, "%s)",query);
 
@@ -1712,12 +1749,12 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 
 	if ( value > 0) /* sensorNode ON */
 	{
-	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE homeid = %d AND sensorNode = %d AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND active = 1 ", homeID, nodeID);
+	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE homeid = %Ld AND sensorNode = %d AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND active = 1 ", homeID, nodeID);
 	    sprintf(startedQry,"1");
 	}
 	else
 	{
-	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE ((sensorNode = %d AND endNode IS NULL) OR (endNode = %d AND startedQry IS NOT NULL)) AND active = 1 AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND homeid = %d", nodeID, nodeID, homeID);
+	    sprintf(query,"SELECT lightNode,id,dependsOnNode,dependsLastAction FROM zonesLights WHERE ((sensorNode = %d AND endNode IS NULL) OR (endNode = %d AND startedQry IS NOT NULL)) AND active = 1 AND TIME(NOW()) >= timeStart AND TIME(NOW()) <= timeEnd AND homeid = %Ld", nodeID, nodeID, homeID);
 	    sprintf(startedQry,"NULL");
 	}
 
@@ -1763,7 +1800,7 @@ void RPC_NodeEvent( int homeID, int nodeID, ValueID valueID, int value )
 		if (myNodes[a][2] > 1)
 		{
 		    int lastTime = myNodes[a][3];
-		    sprintf(query,"(SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),basic.timestamp)) / 60) AS nodeTime, valueINT, basic.timestamp  FROM basic WHERE node = %d AND homeid = %d ORDER BY basic.timestamp DESC LIMIT 1) UNION (SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),switches.timestamp)) / 60) AS nodeTime, status, switches.timestamp  FROM switches WHERE node = %d AND homeid = %d ORDER BY switches.timestamp DESC LIMIT 1)", myNodes[a][2],homeID,myNodes[a][2],homeID);
+		    sprintf(query,"(SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),basic.timestamp)) / 60) AS nodeTime, valueINT, basic.timestamp  FROM basic WHERE node = %d AND homeid = %Ld ORDER BY basic.timestamp DESC LIMIT 1) UNION (SELECT ROUND(TIME_TO_SEC(TIMEDIFF(NOW(),switches.timestamp)) / 60) AS nodeTime, status, switches.timestamp  FROM switches WHERE node = %d AND homeid = %Ld ORDER BY switches.timestamp DESC LIMIT 1)", myNodes[a][2],homeID,myNodes[a][2],homeID);
     		    if(mysql_query(&mysql, query))
     		    {
     		        fprintf(stderr, _("Could not select row. %s %d: \%s \n"), query, mysql_errno(&mysql), mysql_error(&mysql));
@@ -1844,7 +1881,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
         setlocale(LC_NUMERIC, "C");
 
-	printf("%s: HomeId=%d Node=%d\n", (add)?"ValueAdded":"ValueChanged", homeID, nodeID );
+	printf("%s: HomeId=%Ld Node=%d\n", (add)?"ValueAdded":"ValueChanged", homeID, nodeID );
 	printf("Genre=%d\n", genre );
 	printf("CommandClassId=%d\n", id );
 	printf("Instance=%d\n", instanceID );
@@ -1854,7 +1891,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
         sprintf(query, "INSERT INTO notifications (homeid,node,genre,commandclass,instance,`index`,label,units,type,valueINT,valueSTRING,`year`) VALUES (");
 
-	sprintf(query, "%s%d,%d",query,homeID,nodeID);
+	sprintf(query, "%s%Ld,%d",query,homeID,nodeID);
 	sprintf(query, "%s,%d,%d",query,genre,id);
 	sprintf(query, "%s,%d,%d",query,instanceID,valueID.GetIndex());
 	sprintf(query, "%s,\'%s\',\'%s\'",query,label.c_str(), Manager::Get()->GetValueUnits( valueID ).c_str());
@@ -1999,12 +2036,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			if (nodeID == config.washer_node)
 			{
 				sprintf(info,_("[%s] - WASHER OFF - : Node %d Date %s "), config.prefix, nodeID, asctime(timeinfo));
-				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%d,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
+				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%Ld,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, washer_timestart.tm_year+1900,washer_timestart.tm_mon+1,washer_timestart.tm_mday,washer_timestart.tm_hour,washer_timestart.tm_min,washer_timestart.tm_sec,nodeID);
 			}
 			else
 			{
 				sprintf(info,_("[%s] - DISHWASHER OFF - : Node %d Date %s "), config.prefix, nodeID, asctime(timeinfo));
-				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%d,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, dishwasher_timestart.tm_year+1900,dishwasher_timestart.tm_mon+1,dishwasher_timestart.tm_mday,dishwasher_timestart.tm_hour,dishwasher_timestart.tm_min,dishwasher_timestart.tm_sec,nodeID);
+				sprintf(query,"INSERT INTO nodesActionHistory (homeid,nodeId,timeStart,timeEnd,`value`) VALUES (%Ld,%d,\"%d-%d-%d %d:%d:%d\",NOW(),(SELECT `value` FROM powerUsage WHERE nodeId = %d))", homeID, nodeID, dishwasher_timestart.tm_year+1900,dishwasher_timestart.tm_mon+1,dishwasher_timestart.tm_mday,dishwasher_timestart.tm_hour,dishwasher_timestart.tm_min,dishwasher_timestart.tm_sec,nodeID);
 			}
 
 		        mysql_query(&mysql,query);
@@ -2016,6 +2053,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 			if (strlen(config.gg_a2) > 0)
 			    RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+			if (config.telegram_a1 > 0)
+			    RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+			if (config.telegram_a2 > 0)
+			    RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
 		    }
 
@@ -2057,6 +2100,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 			    if (strlen(config.gg_a2) > 0)
 			        RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+			    if (config.telegram_a1 > 0)
+				RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+			    if (config.telegram_a2 > 0)
+				RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
 			    //  fork for sms because too slow	
 			    if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
@@ -2141,6 +2190,13 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 			if (strlen(config.gg_a2) > 0)
 			    RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+			if (config.telegram_a1 > 0)
+			    RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+			if (config.telegram_a2 > 0)
+			    RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
 			
 		    }
 
@@ -2168,7 +2224,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    mysql_real_escape_string(&mysql, to, dev_value, strlen(dev_value));
 	    MYSQL_ROW row;
 
-	    sprintf(query,"SELECT id, endNode, endValue, delayTimeMin, stampOnly, commandclassEnd, instanceEnd, indexEnd FROM zonesStart WHERE homeid = %d AND startNode = %d AND startValue = \"%s\" AND NOW() > actiontimestart AND NOW() < actiontimeend AND active = 1 AND commandclassStart = %d AND instanceStart = %d AND indexStart = %d", homeID, nodeID, to, id, instanceID, valueID.GetIndex());
+	    sprintf(query,"SELECT id, endNode, endValue, delayTimeMin, stampOnly, commandclassEnd, instanceEnd, indexEnd FROM zonesStart WHERE homeid = %Ld AND startNode = %d AND startValue = \"%s\" AND NOW() > actiontimestart AND NOW() < actiontimeend AND active = 1 AND commandclassStart = %d AND instanceStart = %d AND indexStart = %d", homeID, nodeID, to, id, instanceID, valueID.GetIndex());
 	    int res = mysql_query(&mysql,query);
 	    if (res == 0) {
 		MYSQL_RES *result = mysql_store_result(&mysql);
@@ -2233,6 +2289,13 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		    if (strlen(config.gg_a2) > 0)
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
+		    if (config.telegram_a1 > 0)
+		    	RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		    if (config.telegram_a2 > 0)
+			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+
 		    //  fork for sms because too slow
 		    if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
 		    {
@@ -2271,7 +2334,12 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 		if (strlen(config.gg_a2) > 0)
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
-		
+
+		if (config.telegram_a1 > 0)
+			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		if (config.telegram_a2 > 0)
+			RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
 		if (config.alarm_node > 0)
 		{
@@ -2286,7 +2354,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		        if (atoi(row[0]) == 0)
 		        {
 			    printf(_("alarm enabled\n"));
-			    sprintf(query,"SELECT id FROM zonesAlarms WHERE homeid = %d AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) ) ",homeID,nodeID);
+			    sprintf(query,"SELECT id FROM zonesAlarms WHERE homeid = %Ld AND node = %d AND dayOfWeek = WEEKDAY(NOW())+1 AND (HOUR(NOW()) > startHour OR (HOUR(NOW())=startHour AND MINUTE(NOW())>=startMinutes)) AND (HOUR(NOW()) < endHour OR ( HOUR(NOW()) = endHour AND MINUTE(NOW())<endMinutes  ) ) ",homeID,nodeID);
 			    mysql_query(&mysql,query);
 			    result = mysql_store_result(&mysql);
 			    int alarms = 0 ;
@@ -2751,6 +2819,19 @@ int get_configuration(struct config_type *config, char *path)
 			continue;
 		}
 
+		if ( (strcmp(token,"MQT_WASHER") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->mqt_washer, val);
+			continue;
+		}
+
+		if ( (strcmp(token,"MQT_DISHWASHER") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->mqt_dishwasher, val);
+			continue;
+		}
+
+
 		if ( (strcmp(token,"GG_UID") == 0) && (strlen(val) != 0) )
 		{
 			strcpy(config->gg_uid, val);
@@ -2772,6 +2853,24 @@ int get_configuration(struct config_type *config, char *path)
 		if ( (strcmp(token,"GG_PASSWORD") == 0) && (strlen(val) != 0) )
 		{
 			strcpy(config->gg_passwd, val);
+			continue;
+		}
+
+		if ( (strcmp(token,"TELEGRAM_TOKEN") == 0) && (strlen(val) != 0) )
+		{
+			strcpy(config->telegram_token, val);
+			continue;
+		}
+
+		if ( (strcmp(token,"TELEGRAM_ALARMTO1") == 0) && (strlen(val) != 0) )
+		{
+			config->telegram_a1 = atoi(val);
+			continue;
+		}
+
+		if ( (strcmp(token,"TELEGRAM_ALARMTO2") == 0) && (strlen(val) != 0) )
+		{
+			config->telegram_a2 = atoi(val);
 			continue;
 		}
 
@@ -3038,7 +3137,7 @@ timerHandler(sigval_t t )
 
  /////////////////////////////////////
 
-    sprintf(query,"SELECT node FROM `stateGet` where homeid = %d AND NOW() > DATE_ADD(lastupdate, INTERVAL updateEveryMinutes MINUTE)",config.zwave_id);
+    sprintf(query,"SELECT node FROM `stateGet` where homeid = %Ld AND NOW() > DATE_ADD(lastupdate, INTERVAL updateEveryMinutes MINUTE)", g_homeId);
 
         if(mysql_query(&mysql, query))
         {
@@ -3054,7 +3153,7 @@ timerHandler(sigval_t t )
 	        {
 		    printf("NODE %d REFRESH NOW\n",atoi(row[0]));
 		    Manager::Get()->RequestNodeState( g_homeId, atoi(row[0]) );
-		    sprintf(query,"UPDATE stateGet SET lastupdate = NOW() WHERE node = %d LIMIT 1", atoi(row[0]));
+		    sprintf(query,"UPDATE stateGet SET lastupdate = NOW() WHERE node = %d AND homeid = %Ld LIMIT 1", atoi(row[0]), g_homeId);
 	            mysql_query(&mysql,query);
 		}
 	    }
@@ -3069,7 +3168,7 @@ timerHandler(sigval_t t )
 
  /////////////////////////////////////////
 
-	    sprintf(query,"SELECT zS.id, zS.endNode, zS.endValue, zS.delayTimeMin, zS.stampOnly, zS.commandclassEnd, zS.instanceEnd, zS.indexEnd, zS.parentRule, COUNT(z1.id) AS zSum1, COUNT(z2.id) AS zSum2 FROM zonesStart AS zS LEFT JOIN zonesStart AS z1 ON (z1.ruleId = zS.parentRule) LEFT JOIN zonesStart AS z2 ON (z2.ruleId = zS.parentRule AND z2.lastAction IS NOT NULL) WHERE zS.homeid = %d AND zS.actiontimestart > NOW() AND NOW() < zS.actiontimeend AND zS.active = 1 AND zS.delayTimeMin IS NOT NULL AND zS.stampOnly = 1 AND zS.lastAction IS NOT NULL AND NOW() > (zS.lastAction +  INTERVAL zS.delayTimeMin MINUTE) GROUP BY zS.id", g_homeId);
+	    sprintf(query,"SELECT zS.id, zS.endNode, zS.endValue, zS.delayTimeMin, zS.stampOnly, zS.commandclassEnd, zS.instanceEnd, zS.indexEnd, zS.parentRule, COUNT(z1.id) AS zSum1, COUNT(z2.id) AS zSum2 FROM zonesStart AS zS LEFT JOIN zonesStart AS z1 ON (z1.ruleId = zS.parentRule) LEFT JOIN zonesStart AS z2 ON (z2.ruleId = zS.parentRule AND z2.lastAction IS NOT NULL) WHERE zS.homeid = %Ld AND zS.actiontimestart > NOW() AND NOW() < zS.actiontimeend AND zS.active = 1 AND zS.delayTimeMin IS NOT NULL AND zS.stampOnly = 1 AND zS.lastAction IS NOT NULL AND NOW() > (zS.lastAction +  INTERVAL zS.delayTimeMin MINUTE) GROUP BY zS.id", g_homeId);
 	    int res = mysql_query(&mysql,query);
 	    if (res == 0) 
 	    {
@@ -3150,7 +3249,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	if (alarmOn == 0)
 	{
 	    mysql_free_result(result);
-	    sprintf(query,"SELECT IFNULL(ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60),0) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1 AND nodes.homeid = %d) AND b1.homeid = %d", g_homeId, g_homeId);
+	    sprintf(query,"SELECT IFNULL(ROUND(TIMESTAMPDIFF(SECOND,MAX(onState),NOW()) / 60),0) FROM basicLastState AS b1 WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1 AND nodes.homeid = %Ld) AND b1.homeid = %Ld", g_homeId, g_homeId);
     	    mysql_query(&mysql,query);
 	    result = mysql_store_result(&mysql);
 	    num_rows = mysql_num_rows(result);
@@ -3163,7 +3262,7 @@ printf("parValue: %d\n",atoi(row[0]));
 	    printf("onState: %d\n",atoi(row[0]));
 		if ((atoi(row[0]) > 20 && atoi(row[0]) < 23))
 		{
-		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.homeid = %d AND (b2.onState > DATE_ADD(b1.onState, INTERVAL 30 SECOND) OR b2.offState > DATE_ADD(b2.offState, INTERVAL 30 SECOND))) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1 AND nodes.homeid = %d) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %d) AND b1.homeid = %d", g_homeId, g_homeId, g_homeId, g_homeId);
+		    sprintf(query,"SELECT COUNT(b2.nodeid) FROM basicLastState AS b1 LEFT JOIN basicLastState AS b2 ON (b2.homeid = %Ld AND (b2.onState > DATE_ADD(b1.onState, INTERVAL 30 SECOND) OR b2.offState > DATE_ADD(b2.offState, INTERVAL 30 SECOND))) WHERE b1.nodeid IN (SELECT id FROM nodes WHERE alarmNode = 1 AND nodes.homeid = %Ld) AND b2.nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %Ld) AND b1.homeid = %Ld", g_homeId, g_homeId, g_homeId, g_homeId);
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
 		    num_rows = mysql_num_rows(result);
@@ -3203,7 +3302,7 @@ printf("parValue: %d\n",atoi(row[0]));
 
 	    // check nodes
 
-		    sprintf(query,"SELECT COUNT(nodeid) FROM basicLastState WHERE homeid = %d AND onState < NOW() AND onState > DATE_SUB(NOW(), INTERVAL 15 MINUTE) AND nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %d) ", g_homeId, g_homeId);
+		    sprintf(query,"SELECT COUNT(nodeid) FROM basicLastState WHERE homeid = %Ld AND onState < NOW() AND onState > DATE_SUB(NOW(), INTERVAL 15 MINUTE) AND nodeid NOT IN (SELECT id FROM nodes WHERE ignoreNode = 1 AND homeid = %Ld) ", g_homeId, g_homeId);
 		    mysql_query(&mysql,query);
 		    MYSQL_RES *result = mysql_store_result(&mysql);
 		    num_rows = mysql_num_rows(result);
@@ -3301,6 +3400,58 @@ struct json_object * find_json(struct json_object *jobj, const char *key) {
     return tmp;
 }
 
+void json_doarray(json_object *obj, char *topicName);
+
+void
+json_doit(json_object *obj, char *topicName)
+{
+   MYSQL_RES *result;
+   char query[4096];
+   char mystring[4096];
+   char mykey[4096];
+   char myvalue[4096];
+   char topic[4096];
+
+   json_object_object_foreach(obj, key, val)
+   {
+      switch (json_object_get_type(val))
+         {
+          case json_type_array:
+             json_doarray(val, topicName);
+             break;
+
+          case json_type_object:
+             json_doit(val, topicName);
+             break;
+
+          default:
+	     sprintf(mystring, "%s", json_object_get_string(val));
+	     mysql_real_escape_string(&mysql, topic, topicName, strlen(topicName));
+	     mysql_real_escape_string(&mysql, mykey, key, strlen(key));
+	     mysql_real_escape_string(&mysql, myvalue, mystring, strlen(mystring));
+
+	     sprintf(query, "INSERT INTO notificationsZigBeeByParam (topic, `name`, `value`, ctime) VALUES ('%s','%s','%s', NOW())", 
+		topic, mykey, myvalue
+	    );
+
+	    if(mysql_query(&mysql, query))
+	    {
+		fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
+	    }
+
+         }
+   }
+}
+
+void
+json_doarray(json_object *obj, char *topicName)
+{
+   int temp_n = json_object_array_length(obj);
+   for (int i = 0; i < temp_n; i++)
+      json_doit(json_object_array_get_idx(obj, i), topicName);
+}
+
+
 int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *message)
 {
     struct json_object *jobj;
@@ -3311,6 +3462,8 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
     char mystring[4096];
     char content[4096];
     MYSQL_RES *result;
+    MYSQL_ROW rows;
+    int num_rows;
 
     pthread_mutex_lock(&g_criticalSection);
 
@@ -3321,21 +3474,9 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
     if (jobj)
     {
-	json_object_object_foreach(jobj, key, val) 
-        {
-	    sprintf(mystring, "%s", json_object_get_string(val));
-	    mysql_real_escape_string(&mysql, mykey, key, strlen(key));
-	    mysql_real_escape_string(&mysql, myvalue, mystring, strlen(mystring));
+	json_doit(jobj, topicName);
 
-	    sprintf(query, "INSERT INTO notificationsZigBeeByParam (topic, `name`, `value`, ctime) VALUES ('%s','%s','%s', NOW())", 
-		topic, mykey, myvalue
-	    );
-
-	    if(mysql_query(&mysql, query))
-	    {
-		fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
-	    }
-	}
+        json_object_put(jobj);
     }
 
     sprintf(query, "INSERT INTO notificationsZigBee (topic, message, ctime) VALUES ('%s','%s',NOW())", 
@@ -3350,7 +3491,117 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
 
+    // WASHER NODE
+    if (strcmp(topicName, config.mqt_washer) == 0)
+    {
+
+	    sprintf(query,"SELECT (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Current' ORDER BY id DESC limit 1) AS current, (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Total' ORDER BY id DESC limit 1) AS total; ", topicName, topicName);
+	    mysql_query(&mysql,query);
+	    result = mysql_store_result(&mysql);
+	    num_rows = mysql_num_rows(result);
+
+	    if (num_rows > 0)
+	    {
+		rows = mysql_fetch_row(result);
+
+		if (washer_total > 0 && atof(rows[0]) > 0.030 && atof(rows[0]) < 0.040 && atof(rows[1]) == washer_total && washer_status == 1)
+		{
+		    washer_offcounter++;
+		}
+
+		if (washer_total > 0 && atof(rows[0]) > 0.030 && atof(rows[0]) < 0.040 && atof(rows[1]) == washer_total && washer_status == 1 && washer_offcounter > 3)
+		{
+		    washer_status = 2;
+		    washer_offcounter = 0;
+
+		    char info[4096];
+		    time_t rawtime;
+		    struct tm * timeinfo;
+	
+		    time(&rawtime);
+		    timeinfo = localtime(&rawtime);
+
+		    washer_timestart = *localtime(&rawtime);
+		    sprintf(info,_("[%s] - WASHER FINISH -  Date %s"), config.prefix, asctime(timeinfo));
+
+		    if (strlen(config.gg_a1) > 0)
+		    	RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+		    if (strlen(config.gg_a2) > 0)
+			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		    if (config.telegram_a1 > 0)
+			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		    if (config.telegram_a2 > 0)
+			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+		}
+
+		if (washer_total > 0 && atof(rows[0]) < 0.030 && atof(rows[1]) == washer_total && (washer_status == 1 || washer_status == 2))
+		{
+		    washer_status = 0;
+
+		    char info[4096];
+		    time_t rawtime;
+		    struct tm * timeinfo;
+	
+		    time(&rawtime);
+		    timeinfo = localtime(&rawtime);
+
+		    washer_timestart = *localtime(&rawtime);
+		    sprintf(info,_("[%s] - WASHER OFF -  Date %s"), config.prefix, asctime(timeinfo));
+
+		    if (strlen(config.gg_a1) > 0)
+		    	RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+		    if (strlen(config.gg_a2) > 0)
+			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		    if (config.telegram_a1 > 0)
+			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		    if (config.telegram_a2 > 0)
+			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+		}
+
+		if (washer_total > 0 && atof(rows[0]) > 0.030 && washer_status == 0 && atof(rows[1]) > washer_total)
+		{
+		    washer_status = 1;
+
+		    char info[4096];
+		    time_t rawtime;
+		    struct tm * timeinfo;
+	
+		    time(&rawtime);
+		    timeinfo = localtime(&rawtime);
+
+		    washer_timestart = *localtime(&rawtime);
+		    sprintf(info,_("[%s] - WASHER ON -  Date %s"), config.prefix, asctime(timeinfo));
+
+		    if (strlen(config.gg_a1) > 0)
+		    	RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+		    if (strlen(config.gg_a2) > 0)
+			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		    if (config.telegram_a1 > 0)
+			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		    if (config.telegram_a2 > 0)
+			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+		}
+
+		washer_total = atof(rows[1]);
+	    }
+
+	    mysql_free_result(result);
+    }
+
     pthread_mutex_unlock(&g_criticalSection);
+
 
     return 1;
 }
@@ -3486,6 +3737,34 @@ int main(int argc, char* argv[]) {
     pthread_mutex_lock(&initMutex);
 
     mqtt_connect();
+
+    printf("Initializing Telegram ...\n");
+
+    if (telebot_create(&telebot_handle, config.telegram_token) != TELEBOT_ERROR_NONE)
+    {
+        printf("Telebot create failed\n");
+        return -1;
+    }
+
+    telebot_user_t me;
+    if (telebot_get_me(telebot_handle, &me) != TELEBOT_ERROR_NONE)
+    {
+        printf("Failed to get bot information\n");
+//        telebot_destroy(telebot_handle);
+//        return -1;
+    }
+    else
+    {
+        printf("ID: %d\n", me.id);
+        printf("First Name: %s\n", me.first_name);
+        printf("User Name: %s\n", me.username);
+	telebot_put_me(&me);
+    }
+
+    int index, count, offset = -1;
+    telebot_error_e ret;
+    telebot_message_t message;
+    telebot_update_type_e update_types[] = {TELEBOT_UPDATE_TYPE_MESSAGE};
 
     printf("Initializing OpenZWave ...\n");
 
@@ -3720,6 +3999,58 @@ printf("Going ...\n");
                     }
 		}
 
+		if (trim(data.substr(0,5).c_str()) == "ALIVE")
+		{
+		    string tmp = data.substr(5,data.length()-5);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int mynode = strtol(tmp.c_str(),&garbage,0);
+		        if (mynode > 0) 
+			{
+				Manager::Get()->SetNodeAlive(g_homeId, mynode);
+				new_sock << dataOK;
+			}
+		    }
+		}
+
+		if (trim(data.substr(0,6).c_str()) == "HEALTH")
+		{
+
+		    Manager::Get()->HealNetwork(g_homeId, true);
+		    new_sock << dataOK;
+		}
+
+
+		if (trim(data.substr(0,7).c_str()) == "ADDNODE")
+		{
+
+		    Manager::Get()->AddNode(g_homeId, false);
+		    new_sock << dataOK;
+		}
+
+		if (trim(data.substr(0,8).c_str()) == "ADDNODES")
+		{
+
+		    Manager::Get()->AddNode(g_homeId, true);
+		    new_sock << dataOK;
+		}
+
+		if (trim(data.substr(0,10).c_str()) == "NEWPRIMARY")
+		{
+
+		    Manager::Get()->TransferPrimaryRole(g_homeId);
+		    new_sock << dataOK;
+		}
+
+
+		if (trim(data.substr(0,9).c_str()) == "SOFTRESET")
+		{
+		    Manager::Get()->SoftReset(g_homeId);
+		    new_sock << dataOK;
+		}
+
+
 		if (trim(data.substr(0,5).c_str()) == "STATE")
 		{
 		    string tmp = data.substr(5,data.length()-5);
@@ -3780,6 +4111,27 @@ printf("Going ...\n");
 		        if (mynode > 0)
 			{
 			    Manager::Get()->RefreshNodeInfo( g_homeId, mynode );
+			    new_sock << dataOK;
+			}
+		    }
+		}
+
+    
+
+		if (trim(data.substr(0,5).c_str()) == "ASSOC")
+		{
+		    string tmp = data.substr(5,data.length()-5);
+		    char *garbage = NULL;
+		    if (tmp.length() > 0)
+		    {
+			int nodeSrc	= 0;
+			int group	= 0;
+			int nodeDst	= 0;
+			sscanf(tmp.c_str(), "%d,%d,%d", &nodeSrc, &group, &nodeDst);
+
+		        if (nodeSrc > 0)
+			{
+			    Manager::Get()->AddAssociation(g_homeId, nodeSrc, group, nodeDst);
 			    new_sock << dataOK;
 			}
 		    }
@@ -3948,16 +4300,23 @@ printf("Going ...\n");
 		if (trim(data.c_str()) == "SET")
 		{
         	        pthread_mutex_lock(&g_criticalSection);
+
 /*
     Manager::Get()->RemoveAssociation(g_homeId, 10, 1, 3);
     Manager::Get()->RemoveAssociation(g_homeId, 10, 1, 2);
     Manager::Get()->RemoveAssociation(g_homeId, 10, 1, 4);
     Manager::Get()->RemoveAssociation(g_homeId, 10, 1, 7);
 */
-    Manager::Get()->AddAssociation(g_homeId, 3, 2, 19);
-    Manager::Get()->AddAssociation(g_homeId, 2, 2, 19);
-    Manager::Get()->AddAssociation(g_homeId, 4, 2, 19);
-    Manager::Get()->AddAssociation(g_homeId, 7, 2, 19);
+
+    Manager::Get()->AddAssociation(g_homeId, 3, 2, 17);
+    Manager::Get()->AddAssociation(g_homeId, 2, 2, 17);
+    Manager::Get()->AddAssociation(g_homeId, 4, 2, 17);
+    Manager::Get()->AddAssociation(g_homeId, 7, 2, 17);
+
+    Manager::Get()->AddAssociation(g_homeId, 3, 2, 10);
+    Manager::Get()->AddAssociation(g_homeId, 2, 2, 10);
+    Manager::Get()->AddAssociation(g_homeId, 4, 2, 10);
+    Manager::Get()->AddAssociation(g_homeId, 7, 2, 10);
 
 /*
 			Manager::Get()->SetConfigParam(g_homeId, 13, 101, 225); // 11100001=1+32+64+128=225
@@ -4015,6 +4374,19 @@ printf("Going ...\n");
 			new_sock << dataOK;
 
 		}
+
+		if (trim(data.c_str()) == "TELEGRAMTEST")
+		{
+		    char info[4096];
+		    sprintf(info, "TEST TELEGRAM");
+
+		    if (config.telegram_a1 > 0)
+			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		    if (config.telegram_a2 > 0)
+			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+		}
+
 
                         //give list of devices
                         if (trim(data.c_str()) == "ALIST") {
@@ -4091,6 +4463,44 @@ printf("Going ...\n");
                                 new_sock << result;
                             }
 
+                            if (command == "REFRESHMQT") {
+				if (rc == MQTTCLIENT_SUCCESS)
+			        {
+					sprintf(query,"SELECT topic FROM nodesZigBee");
+				        mysql_query(&mysql,query);
+					result = mysql_store_result(&mysql);
+					num_rows = mysql_num_rows(result);
+
+				    if (num_rows > 0)
+				    {
+					while ((row = mysql_fetch_row(result)))
+					{
+					    printf("Unsubscribing to topic %s\n", row[0]);
+	        			    MQTTClient_unsubscribe(client, row[0]);
+					}
+				    }
+
+				    mysql_free_result(result);
+				    sprintf(query,"SELECT topic FROM nodesZigBee");
+				    mysql_query(&mysql,query);
+				    result = mysql_store_result(&mysql);
+				    num_rows = mysql_num_rows(result);
+
+				    if (num_rows > 0)
+				    {
+					while ((row = mysql_fetch_row(result)))
+	    				{
+					    printf("Subscribing to topic %s\n", row[0]);
+					    MQTTClient_subscribe(client, row[0], 1);
+					}
+				    }
+
+				    mysql_free_result(result);
+
+				}
+
+			    }
+
                             if (command == "SETNODE") {
                                 int Node = 0;
                                 string NodeName = "";
@@ -4163,6 +4573,8 @@ printf("Going ...\n");
 	MQTTClient_disconnect(client, 10000);
         MQTTClient_destroy(&client);
     }
+
+    telebot_destroy(telebot_handle);
 
     return 0;
 }
