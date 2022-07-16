@@ -157,13 +157,13 @@ struct config_type
 
 
 // WASHER variables
-float  washer_status		= 0;
-float  washer_total		= 0;
+int    washer_status		= 0;
+double  washer_total		= 0;
 int    washer_offcounter	= -1;
 struct tm washer_timestart;
 
-float  dishwasher_status	= 0;
-float  dishwasher_total		= 0;
+int    dishwasher_status	= 0;
+double  dishwasher_total	= 0;
 int    dishwasher_offcounter	= -1;
 struct tm dishwasher_timestart;
 
@@ -1090,6 +1090,9 @@ int RPC_SendTelegram(long int number, const char *text)
     {
         printf("Failed to send message: %d \n", ret);
     }
+
+    return ret;
+
 }
 
 /* GaduGadu *************************************************************************/
@@ -1482,6 +1485,8 @@ void *smsNow(void * minfo)
 
 void alarm(char *info)
 {
+    int res = -1;
+
 		if (strlen(config.gg_a1) > 0)
 			RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
 
@@ -1489,18 +1494,17 @@ void alarm(char *info)
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 		if (config.telegram_a1 > 0)
-			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 		if (config.telegram_a2 > 0)
-			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
-		if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
+		if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
 		{
 		    pthread_t sms_thread; 
 		    pthread_create(&sms_thread, NULL, smsNow, info);
 		    usleep(900000);
 		}
-
 }
 
 
@@ -2046,6 +2050,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 		        mysql_query(&mysql,query);
 			int valpar = 0;
+			int res = -1;
 			setValueByAll( g_homeId, nodeID, 50, 1, 33, &valpar ); // reset
 
 			if (strlen(config.gg_a1) > 0)
@@ -2055,10 +2060,10 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			    RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 			if (config.telegram_a1 > 0)
-			    RPC_SendTelegram(config.telegram_a1, (const char *) info);
+			    res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 			if (config.telegram_a2 > 0)
-			    RPC_SendTelegram(config.telegram_a2, (const char *) info);
+			    res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
 		    }
 
@@ -2083,6 +2088,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			if ((washer_offcounter > 10 && nodeID == config.washer_node) || (dishwasher_offcounter > 20 && nodeID == config.dishwasher_node)) // 10 actions under 15 so off?
 			{
 			    // send alarm
+			    int res = 0;
 			    char info[4096];
 			    time_t rawtime;
 			    struct tm * timeinfo;
@@ -2102,13 +2108,13 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			        RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 			    if (config.telegram_a1 > 0)
-				RPC_SendTelegram(config.telegram_a1, (const char *) info);
+				res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 			    if (config.telegram_a2 > 0)
-				RPC_SendTelegram(config.telegram_a2, (const char *) info);
+				res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
 			    //  fork for sms because too slow	
-			    if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
+			    if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
 			    {
 				pthread_t sms_thread;
 				pthread_create(&sms_thread, NULL, smsNow, &info);
@@ -2274,6 +2280,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 
 		if (config.smoke_node[i] == nodeID  && strcmp(dev_value,"1") == 0 )
 	        {
+		    int res = -1;
 		    char info[4096];
 		    time_t rawtime;
 		    struct tm * timeinfo;
@@ -2290,14 +2297,13 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 		    if (config.telegram_a1 > 0)
-		    	RPC_SendTelegram(config.telegram_a1, (const char *) info);
+		    	res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 		    if (config.telegram_a2 > 0)
-			RPC_SendTelegram(config.telegram_a2, (const char *) info);
-
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
 		    //  fork for sms because too slow
-		    if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
+		    if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
 		    {
 			pthread_t sms_thread;
 			pthread_create(&sms_thread, NULL, smsNow, &info);
@@ -2321,6 +2327,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 	    // Flood On value: 255, 254, 2
 	    if (strcmp(label.c_str(),"Flood") == 0 && (strcmp(dev_value,"255") == 0 || strcmp(dev_value,"2") == 0 || strcmp(dev_value,"254") == 0))
 	    {
+		int res = -1;
 		char info[4096];
 		time_t rawtime;
 		struct tm * timeinfo;
@@ -2336,10 +2343,10 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 		if (config.telegram_a1 > 0)
-			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 		if (config.telegram_a2 > 0)
-			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
 		if (config.alarm_node > 0)
 		{
@@ -2378,7 +2385,7 @@ void RPC_ValueChanged( int homeID, int nodeID, ValueID valueID, bool add, Notifi
 		}
 
 		//  fork for sms because too slow
-		if (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0)
+		if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
 		{
 			pthread_t sms_thread;
 			pthread_create(&sms_thread, NULL, smsNow, &info);
@@ -3466,6 +3473,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
     int num_rows;
 
     pthread_mutex_lock(&g_criticalSection);
+    setlocale(LC_NUMERIC, "C");
 
     mysql_real_escape_string(&mysql, topic, topicName, strlen(topicName));
     mysql_real_escape_string(&mysql, content, (const char *) message->payload, message->payloadlen);
@@ -3488,14 +3496,15 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
         fprintf(stderr, "Could not insert row. %s %d: \%s \n", query, mysql_errno(&mysql), mysql_error(&mysql));
     }
 
+    printf("topic: '%s' [%s]\n", topicName, content);
+
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
 
-    // WASHER NODE
-    if (strcmp(topicName, config.mqt_washer) == 0)
+    // DISHWASHER NODE
+    if (strcmp(topic, config.mqt_dishwasher) == 0)
     {
-
-	    sprintf(query,"SELECT (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Current' ORDER BY id DESC limit 1) AS current, (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Total' ORDER BY id DESC limit 1) AS total; ", topicName, topicName);
+	    sprintf(query,"SELECT (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Current' ORDER BY id DESC limit 1) AS current, (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Total' ORDER BY id DESC limit 1) AS total; ", topic, topic);
 	    mysql_query(&mysql,query);
 	    result = mysql_store_result(&mysql);
 	    num_rows = mysql_num_rows(result);
@@ -3503,10 +3512,106 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	    if (num_rows > 0)
 	    {
 		rows = mysql_fetch_row(result);
+		printf("Dishwasher: %f/%f\n", atof(rows[0]), atof(rows[1]));
+
+		if (dishwasher_total > 0 && atof(rows[0]) < 0.030 && atof(rows[1]) == dishwasher_total && (dishwasher_status == 1 || dishwasher_status == 2))
+		{
+		    dishwasher_status = 0;
+		    dishwasher_offcounter = 0;
+		    int res = -1;
+
+		    char info[4096];
+		    time_t rawtime;
+		    struct tm * timeinfo;
+	
+		    time(&rawtime);
+		    timeinfo = localtime(&rawtime);
+
+		    dishwasher_timestart = *localtime(&rawtime);
+		    sprintf(info,_("[%s] - DISHWASHER OFF -  Date %s"), config.prefix, asctime(timeinfo));
+
+		    if (strlen(config.gg_a1) > 0)
+		    	RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+		    if (strlen(config.gg_a2) > 0)
+			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		    if (config.telegram_a1 > 0)
+			res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		    if (config.telegram_a2 > 0)
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+		    if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
+		    {
+			pthread_t sms_thread; 
+		        pthread_create(&sms_thread, NULL, smsNow, info);
+			usleep(900000);
+		    }
+
+		}
+
+		if (dishwasher_total > 0 && atof(rows[0]) > 0.060 && dishwasher_status == 0 && atof(rows[1]) > dishwasher_total)
+		{
+		    dishwasher_status = 1;
+		    dishwasher_offcounter = 0;
+
+		    int res = -1;
+		    char info[4096];
+		    time_t rawtime;
+		    struct tm * timeinfo;
+	
+		    time(&rawtime);
+		    timeinfo = localtime(&rawtime);
+
+		    dishwasher_timestart = *localtime(&rawtime);
+		    sprintf(info,_("[%s] - DISHWASHER ON -  Date %s"), config.prefix, asctime(timeinfo));
+
+		    if (strlen(config.gg_a1) > 0)
+		    	RPC_SendGG(atoi(config.gg_a1), (unsigned char *) info);
+
+		    if (strlen(config.gg_a2) > 0)
+			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
+
+		    if (config.telegram_a1 > 0)
+			res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
+
+		    if (config.telegram_a2 > 0)
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+		    if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
+		    {
+			pthread_t sms_thread; 
+		        pthread_create(&sms_thread, NULL, smsNow, info);
+			usleep(900000);
+		    }
+		}
+
+		dishwasher_total = atof(rows[1]);
+	    }
+
+	    mysql_free_result(result);
+    }
+
+    // WASHER NODE
+    printf("WASHER?: '%s'='%s' = %d : %f\n", topic, config.mqt_washer,washer_status,washer_total);
+    if (strcmp(topic, config.mqt_washer) == 0)
+    {
+	    sprintf(query,"SELECT (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Current' ORDER BY id DESC limit 1) AS current, (SELECT `value` FROM `notificationsZigBeeByParam` WHERE topic = '%s' AND name = 'Total' ORDER BY id DESC limit 1) AS total; ", topic, topic);
+	    mysql_query(&mysql,query);
+	    result = mysql_store_result(&mysql);
+	    num_rows = mysql_num_rows(result);
+
+	    if (num_rows > 0)
+	    {
+		rows = mysql_fetch_row(result);
+		printf("Washer: %f/%f\n", atof(rows[0]), atof(rows[1]));
 
 		if (washer_total > 0 && atof(rows[0]) > 0.030 && atof(rows[0]) < 0.040 && atof(rows[1]) == washer_total && washer_status == 1)
 		{
 		    washer_offcounter++;
+		} else {
+		    washer_offcounter = 0;
 		}
 
 		if (washer_total > 0 && atof(rows[0]) > 0.030 && atof(rows[0]) < 0.040 && atof(rows[1]) == washer_total && washer_status == 1 && washer_offcounter > 3)
@@ -3517,7 +3622,8 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 		    char info[4096];
 		    time_t rawtime;
 		    struct tm * timeinfo;
-	
+		    int res = -1;
+
 		    time(&rawtime);
 		    timeinfo = localtime(&rawtime);
 
@@ -3531,16 +3637,25 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 		    if (config.telegram_a1 > 0)
-			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 		    if (config.telegram_a2 > 0)
-			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+		    if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
+		    {
+			pthread_t sms_thread; 
+		        pthread_create(&sms_thread, NULL, smsNow, info);
+			usleep(900000);
+		    }
 
 		}
 
 		if (washer_total > 0 && atof(rows[0]) < 0.030 && atof(rows[1]) == washer_total && (washer_status == 1 || washer_status == 2))
 		{
 		    washer_status = 0;
+		    washer_offcounter = 0;
+		    int res = -1;
 
 		    char info[4096];
 		    time_t rawtime;
@@ -3559,17 +3674,26 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 		    if (config.telegram_a1 > 0)
-			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 		    if (config.telegram_a2 > 0)
-			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
+
+		    if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
+		    {
+			pthread_t sms_thread; 
+		        pthread_create(&sms_thread, NULL, smsNow, info);
+			usleep(900000);
+		    }
 
 		}
 
 		if (washer_total > 0 && atof(rows[0]) > 0.030 && washer_status == 0 && atof(rows[1]) > washer_total)
 		{
 		    washer_status = 1;
+		    washer_offcounter = 0;
 
+		    int res = -1;
 		    char info[4096];
 		    time_t rawtime;
 		    struct tm * timeinfo;
@@ -3587,11 +3711,17 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			RPC_SendGG(atoi(config.gg_a2), (unsigned char *) info);
 
 		    if (config.telegram_a1 > 0)
-			RPC_SendTelegram(config.telegram_a1, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a1, (const char *) info);
 
 		    if (config.telegram_a2 > 0)
-			RPC_SendTelegram(config.telegram_a2, (const char *) info);
+			res = RPC_SendTelegram(config.telegram_a2, (const char *) info);
 
+		    if (TELEBOT_ERROR_NONE != res && (strlen(config.sms_phone1) > 0 || strlen(config.sms_phone2) > 0))
+		    {
+			pthread_t sms_thread; 
+		        pthread_create(&sms_thread, NULL, smsNow, info);
+			usleep(900000);
+		    }
 		}
 
 		washer_total = atof(rows[1]);
