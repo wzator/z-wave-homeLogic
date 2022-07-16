@@ -8,401 +8,431 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2015-07-10 22:07+0200\n"
+"POT-Creation-Date: 2022-07-12 20:42+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: polski <LL@li.org>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: ../Main.cpp:337
+#: ../Main.cpp:360
 #, c-format
 msgid ", message reference=%d\n"
-msgstr ", numer wiadomości=%d\n"
+msgstr ""
 
-#: ../Main.cpp:1500
+#: ../Main.cpp:1552
 #, c-format
 msgid "- IGNORE AUTO - : Node %d Home %d Date %s"
-msgstr "- IGNORUJ AUTO - : Urządzenie %d Sieć %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:331
+#: ../Main.cpp:354
 #, c-format
 msgid "..OK"
-msgstr "..OK"
+msgstr ""
 
-#: ../Main.cpp:334
+#: ../Main.cpp:357
 #, c-format
 msgid "..error %i"
-msgstr "..błąd %i"
+msgstr ""
 
-#: ../Main.cpp:516
+#: ../Main.cpp:539
 #, c-format
 msgid "8-bit message, can not display\n"
-msgstr "8-bitowa wiadomość, nie mogę wyświetlić\n"
+msgstr ""
 
-#: ../Main.cpp:2239
+#: ../Main.cpp:2381
 #, c-format
 msgid "ALARM ON = NODE %d : %d\n"
-msgstr "ALARM WŁĄCZONY = URZĄDZENIE %d : %d\n"
+msgstr ""
 
-#: ../Main.cpp:2155 ../Main.cpp:2992
+#: ../Main.cpp:2243 ../Main.cpp:3191
 #, c-format
 msgid "Action zoneStart : %s\n"
 msgstr ""
 
-#: ../Main.cpp:971
+#: ../Main.cpp:994
 #, c-format
 msgid ""
 "An attacker might change the default server key to confuse your client into "
 "thinking the key does not exist\n"
 msgstr ""
 
-#: ../Main.cpp:1666
+#: ../Main.cpp:1718
 #, c-format
-msgid "BASIC_CLASS: HomeId=%d Node=%d Value=%d\n"
+msgid "BASIC_CLASS: HomeId=%Ld Node=%d Value=%d\n"
 msgstr ""
 
-#: ../Main.cpp:1071
+#: ../Main.cpp:1116
 #, c-format
 msgid "Can not connect: %s\n"
 msgstr ""
 
-#: ../Main.cpp:3225
+#: ../Main.cpp:3821
 #, c-format
 msgid "Cannot initialize MySQL"
 msgstr ""
 
-#: ../Main.cpp:1130
+#: ../Main.cpp:1175
 #, c-format
 msgid "Command class: %d\n"
 msgstr ""
 
-#: ../Main.cpp:1077 ../Main.cpp:1083
+#: ../Main.cpp:1122 ../Main.cpp:1128
 #, c-format
 msgid "Connection aborted: %s\n"
 msgstr ""
 
-#: ../Main.cpp:1092
+#: ../Main.cpp:1137
 #, c-format
 msgid "Connection broken: %s\n"
 msgstr ""
 
-#: ../Main.cpp:2816
+#: ../Main.cpp:3015
 #, c-format
 msgid "ControllerState Event:  unknown response"
 msgstr ""
 
-#: ../Main.cpp:2790
+#: ../Main.cpp:2989
 #, c-format
 msgid "ControllerState Event: command has completed successfully"
 msgstr ""
 
-#: ../Main.cpp:2795
+#: ../Main.cpp:2994
 #, c-format
 msgid "ControllerState Event: command has failed"
 msgstr ""
 
-#: ../Main.cpp:2785
+#: ../Main.cpp:2984
 #, c-format
 msgid "ControllerState Event: communicating with the other device"
 msgstr ""
 
-#: ../Main.cpp:2775
+#: ../Main.cpp:2974
 #, c-format
 msgid "ControllerState Event: no command in progress"
 msgstr ""
 
-#: ../Main.cpp:2808
+#: ../Main.cpp:3007
 #, c-format
 msgid "ControllerState Event: the node has failed"
 msgstr ""
 
-#: ../Main.cpp:2800
+#: ../Main.cpp:2999
 #, c-format
 msgid "ControllerState Event: the node is OK"
 msgstr ""
 
-#: ../Main.cpp:2780
+#: ../Main.cpp:2979
 #, c-format
 msgid "ControllerState Event: waiting for a user action"
 msgstr ""
 
-#: ../Main.cpp:975
+#: ../Main.cpp:998
 #, c-format
 msgid "Could not find known host file.\n"
 msgstr ""
 
-#: ../Main.cpp:1583 ../Main.cpp:1692
+#: ../Main.cpp:1635 ../Main.cpp:1749
 #, c-format
 msgid "Could not insert row. %s %d: %s \n"
 msgstr ""
 
-#: ../Main.cpp:1710 ../Main.cpp:1753 ../Main.cpp:2841 ../Main.cpp:2869
-#: ../Main.cpp:2922 ../Main.cpp:2952
+#: ../Main.cpp:1767 ../Main.cpp:1810 ../Main.cpp:3040 ../Main.cpp:3068
+#: ../Main.cpp:3121 ../Main.cpp:3151
 #, c-format
 msgid "Could not select row. %s %d: %s \n"
 msgstr ""
 
-#: ../Main.cpp:608
+#: ../Main.cpp:631
 msgid "DISABLED: Sensors always on"
-msgstr "WYLACZONE: Wszystkie czujniki wlaczone"
+msgstr ""
 
-#: ../Main.cpp:593
+#: ../Main.cpp:616
 msgid "ENABLED: Sensors always on"
-msgstr "WLACZONE: Wszystkie czyjniki wlaczone"
+msgstr ""
 
-#: ../Main.cpp:859
+#: ../Main.cpp:882
 msgid "ERROR connecting"
 msgstr ""
 
-#: ../Main.cpp:787
+#: ../Main.cpp:810
 msgid "ERROR opening socket"
 msgstr ""
 
-#: ../Main.cpp:884
+#: ../Main.cpp:907
 msgid "ERROR reading from socket"
 msgstr ""
 
-#: ../Main.cpp:878
+#: ../Main.cpp:901
 msgid "ERROR writing to socket"
 msgstr ""
 
-#: ../Main.cpp:792
+#: ../Main.cpp:815
 #, c-format
 msgid "ERROR, no such host\n"
 msgstr ""
 
-#: ../Main.cpp:344 ../Main.cpp:357
+#: ../Main.cpp:367 ../Main.cpp:380
 #, c-format
 msgid "ERROR: %s\n"
 msgstr ""
 
-#: ../Main.cpp:993
+#: ../Main.cpp:1016
 #, c-format
 msgid "Error %s"
 msgstr ""
 
-#: ../Main.cpp:986
+#: ../Main.cpp:1009
 #, c-format
 msgid "Error %s\n"
 msgstr ""
 
-#: ../Main.cpp:1038
+#: ../Main.cpp:1061
 #, c-format
 msgid "Error authenticating with password: %s\n"
 msgstr ""
 
-#: ../Main.cpp:1019
+#: ../Main.cpp:1042
 #, c-format
 msgid "Error connecting to localhost: %s\n"
 msgstr ""
 
-#: ../Main.cpp:577
+#: ../Main.cpp:600
 msgid "FREEDAY active"
-msgstr "WOLNY DZIEN aktywowany"
+msgstr ""
 
-#: ../Main.cpp:966
+#: ../Main.cpp:989
 #, c-format
 msgid "For security reasons, connection will be stopped\n"
 msgstr ""
 
-#: ../Main.cpp:964
+#: ../Main.cpp:987
 #, c-format
 msgid "Host key for server changed: it is now:\n"
 msgstr ""
 
-#: ../Main.cpp:976
+#: ../Main.cpp:999
 #, c-format
 msgid ""
 "If you accept the host key here, the file will be automatically created.\n"
 msgstr ""
 
-#: ../Main.cpp:539
+#: ../Main.cpp:562
 msgid "LOCK active"
-msgstr "ZAMEK wlaczony"
+msgstr ""
 
-#: ../Main.cpp:558
+#: ../Main.cpp:581
 msgid "LOCK deactivated"
-msgstr "ZAMEK wylaczony"
+msgstr ""
 
-#: ../Main.cpp:508
+#: ../Main.cpp:531
 #, c-format
 msgid "Location: %d, Folder: %d\n"
 msgstr ""
 
-#: ../Main.cpp:1533
+#: ../Main.cpp:1585
 #, c-format
 msgid "No move [%d]\n"
-msgstr "Brak ruchu [%d]\n"
+msgstr ""
 
-#: ../Main.cpp:509
+#: ../Main.cpp:532
 #, c-format
 msgid "Number: \"%s\"\n"
-msgstr "Telefon: \"%s\"\n"
+msgstr ""
 
-#: ../Main.cpp:507
+#: ../Main.cpp:530
 #, c-format
 msgid "Number: %d\n"
-msgstr "Telefon: %d\n"
+msgstr ""
 
-#: ../Main.cpp:965
+#: ../Main.cpp:988
 msgid "Public key hash"
 msgstr ""
 
-#: ../Main.cpp:981
+#: ../Main.cpp:1004
 #, c-format
 msgid "Public key hash: %s\n"
 msgstr ""
 
-#: ../Main.cpp:283
+#: ../Main.cpp:306
 msgid "Request nonblocking I/O"
 msgstr ""
 
-#: ../Main.cpp:1099
+#: ../Main.cpp:1144
 #, c-format
 msgid "Send.\n"
-msgstr "Wyslany.\n"
+msgstr ""
 
-#: ../Main.cpp:329
+#: ../Main.cpp:352
 #, c-format
 msgid "Sent SMS on device: \"%s\"\n"
 msgstr ""
 
-#: ../Main.cpp:277
+#: ../Main.cpp:300
 msgid "Set TTL option"
 msgstr ""
 
-#: ../Main.cpp:1771
+#: ../Main.cpp:1828
 #, c-format
 msgid "Skip Node %d from %d (time %s/%s last time %d : %s)\n"
 msgstr ""
 
-#: ../Main.cpp:2970
+#: ../Main.cpp:3169
 #, c-format
 msgid "TIMER: [STATE] Nothing to do\n"
 msgstr ""
 
-#: ../Main.cpp:2940
+#: ../Main.cpp:3139
 #, c-format
 msgid "TIMER: [TV] Nothing to do\n"
 msgstr ""
 
-#: ../Main.cpp:2857
+#: ../Main.cpp:3056
 #, c-format
 msgid "TIMER: [ZONESPOWER] Nothing to do\n"
 msgstr ""
 
-#: ../Main.cpp:519
+#: ../Main.cpp:542
 #, c-format
 msgid "Text: \"%s\"\n"
 msgstr ""
 
-#: ../Main.cpp:970
+#: ../Main.cpp:993
 #, c-format
 msgid ""
 "The host key for this server was not found but an other type of key exists.\n"
 msgstr ""
 
-#: ../Main.cpp:980
+#: ../Main.cpp:1003
 #, c-format
 msgid "The server is unknown. Do you trust the host key?\n"
 msgstr ""
 
-#: ../Main.cpp:1798
+#: ../Main.cpp:1855
 #, c-format
 msgid "Zones validate for node %d"
 msgstr ""
 
-#: ../Main.cpp:3092
+#: ../Main.cpp:3291
 #, c-format
 msgid "[%s] - ALARM - : LOCK activated - Date %s"
-msgstr "[%s] - ALARM - : ZAMEK aktywowany - Data %s"
+msgstr ""
 
-#: ../Main.cpp:3131
+#: ../Main.cpp:3330
 #, c-format
 msgid "[%s] - ALARM - : LOCK deactivated - %d nodes - Date %s"
-msgstr "[%s] - ALARM - : ZAMEK dezaktywowany - %d urzadzen - Data %s"
+msgstr ""
 
-#: ../Main.cpp:2200
+#: ../Main.cpp:2337
 #, c-format
 msgid "[%s] - ALARM - : Node %d Date %s"
-msgstr "[%s] - ALARM - : Urzadzenie %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:2032
+#: ../Main.cpp:2102
 #, c-format
 msgid "[%s] - DISHWASHER FINISH - : Node %d Date %s"
-msgstr "[%s] - ZMYWARKA KONCZY ZMYWANIE - : Urzadzenie %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:1985
+#: ../Main.cpp:3531
+#, c-format
+msgid "[%s] - DISHWASHER OFF -  Date %s"
+msgstr ""
+
+#: ../Main.cpp:2047
 #, c-format
 msgid "[%s] - DISHWASHER OFF - : Node %d Date %s "
-msgstr "[%s] - ZMYWARKA WYLACZONA - : Urzadzenie %d Data %s "
+msgstr ""
 
-#: ../Main.cpp:2113
+#: ../Main.cpp:3568
+#, c-format
+msgid "[%s] - DISHWASHER ON -  Date %s"
+msgstr ""
+
+#: ../Main.cpp:2189
 #, c-format
 msgid "[%s] - DISHWASHER ON - : Node %d Date %s"
-msgstr "[%s] - ZMYWARKA WLACZONA - : Urzadzenie %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:1526
+#: ../Main.cpp:2291
+#, c-format
+msgid "[%s] - FIRE - : Node %d Date %s"
+msgstr ""
+
+#: ../Main.cpp:1578
 #, c-format
 msgid "[%s] - MOVE - : Node %d Date %s"
-msgstr "[%s] - RUCH - : Urzadzenie %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:1493
+#: ../Main.cpp:1545
 #, c-format
 msgid "[%s] - MOVE AUTO - : Node %d Home %d Date %s"
-msgstr "[%s] - RUCH AUTO - : Urzadzenie %d Siec %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:1553
+#: ../Main.cpp:1605
 #, c-format
 msgid "[%s] - ONE MOVE - : Node %d Date %s"
-msgstr "[%s] - RUCH JEDNOKROTNY - : Urzadzenie %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:2030
+#: ../Main.cpp:3631
+#, c-format
+msgid "[%s] - WASHER FINISH -  Date %s"
+msgstr ""
+
+#: ../Main.cpp:2100
 #, c-format
 msgid "[%s] - WASHER FINISH - : Node %d Date %s "
-msgstr "[%s] - PRALKA KONCZY PRANIE - : Urzadzenie %d Data %s "
+msgstr ""
 
-#: ../Main.cpp:1980
+#: ../Main.cpp:3668
+#, c-format
+msgid "[%s] - WASHER OFF -  Date %s"
+msgstr ""
+
+#: ../Main.cpp:2042
 #, c-format
 msgid "[%s] - WASHER OFF - : Node %d Date %s "
-msgstr "[%s] - PRALKA WYLACZONA - : Urzadzenie %d Data %s "
+msgstr ""
 
-#: ../Main.cpp:2108
+#: ../Main.cpp:3705
+#, c-format
+msgid "[%s] - WASHER ON -  Date %s"
+msgstr ""
+
+#: ../Main.cpp:2184
 #, c-format
 msgid "[%s] - WASHER ON - : Node %d Date %s"
-msgstr "[%s] - PRALKA WLACZONA - : Urzadzenie %d Data %s"
+msgstr ""
 
-#: ../Main.cpp:813
+#: ../Main.cpp:836
 #, c-format
 msgid "add: %s = %s\n"
 msgstr ""
 
-#: ../Main.cpp:2221
+#: ../Main.cpp:2363
 #, c-format
 msgid "alarm enabled\n"
-msgstr "alarm wlaczony\n"
+msgstr ""
 
-#: ../Main.cpp:2217
+#: ../Main.cpp:2359
 #, c-format
 msgid "alarm node available\n"
 msgstr ""
 
-#: ../Main.cpp:2229
+#: ../Main.cpp:2371
 #, c-format
 msgid "alarm zone : %s\n"
 msgstr ""
 
-#: ../Main.cpp:797
+#: ../Main.cpp:820
 msgid "getifaddrs"
 msgstr ""
 
-#: ../Main.cpp:265
+#: ../Main.cpp:288
 msgid "getprotobyname errror"
 msgstr ""
 
-#: ../Main.cpp:308
+#: ../Main.cpp:331
 msgid "sendto"
 msgstr ""
